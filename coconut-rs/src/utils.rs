@@ -16,13 +16,76 @@ use core::iter::Sum;
 use core::ops::Mul;
 use std::convert::TryInto;
 
-use bls12_381::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar};
 use bls12_381::hash_to_curve::{ExpandMsgXmd, HashToCurve, HashToField};
+use bls12_381::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar};
 use ff::Field;
 
 use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
 use crate::scheme::SignerIndex;
+
+//copied from cli-demo to be used as hashable type
+#[derive(Clone)]
+enum RawAttribute {
+    Text(String),
+    Number(u64),
+}
+
+fn hash_to_scalar<M>(msg: M) -> Attribute
+where
+    M: AsRef<[u8]>,
+{
+    let mut h = Sha256::new();
+    h.update(msg);
+    let digest = h.finalize();
+
+    let mut bytes = [0u8; 64];
+    let pad_size = 64usize
+        .checked_sub(<Sha256 as Digest>::OutputSize::to_usize())
+        .unwrap_or_default();
+
+    bytes[pad_size..].copy_from_slice(&digest);
+
+    Attribute::from_bytes_wide(&bytes)
+}
+
+impl From<RawAttribute> for Attribute {
+    fn from(raw_attribute: RawAttribute) -> Attribute {
+        match raw_attribute {
+            RawAttribute::Text(raw) => hash_to_scalar(raw.as_bytes()),
+            RawAttribute::Number(num) => Attribute::from(num),
+        }
+    }
+}
+
+impl Display for RawAttribute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            RawAttribute::Text(text) => write!(f, "{}", text),
+            RawAttribute::Number(num) => write!(f, "{}", num),
+        }
+    }
+}
+
+impl Debug for RawAttribute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            RawAttribute::Text(text) => write!(f, "{}", text),
+            RawAttribute::Number(num) => write!(f, "{}", num),
+        }
+    }
+}
+
+impl From<String> for RawAttribute {
+    fn from(raw: String) -> Self {
+        // try to parse as number
+        if let Ok(num) = raw.parse::<u64>() {
+            RawAttribute::Number(num)
+        } else {
+            RawAttribute::Text(raw)
+        }
+    }
+}
 
 pub struct Polynomial {
     coefficients: Vec<Scalar>,
@@ -92,9 +155,9 @@ pub(crate) fn perform_lagrangian_interpolation_at_origin<T>(
     points: &[SignerIndex],
     values: &[T],
 ) -> Result<T>
-    where
-        T: Sum,
-        for<'a> &'a T: Mul<Scalar, Output=T>,
+where
+    T: Sum,
+    for<'a> &'a T: Mul<Scalar, Output = T>,
 {
     if points.is_empty() || values.is_empty() {
         return Err(CoconutError::Interpolation(
