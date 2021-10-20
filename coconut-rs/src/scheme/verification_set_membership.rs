@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
-use bls12_381::{multi_miller_loop, G1Affine, G1Projective, G2Prepared, G2Projective, Scalar};
+use bls12_381::{multi_miller_loop, G1Affine, G2Prepared, G2Projective, Scalar};
 use group::{Curve, Group};
 
 use crate::error::{CoconutError, Result};
@@ -115,7 +115,7 @@ impl Base58 for Theta {}
 pub fn issue_membership_signatures(
     params: &Parameters,
     phi: &[RawAttribute],
-) -> HashMap<RawAttribute, G1Projective> {
+) -> HashMap<RawAttribute, Signature> {
     let sp_key_pair = single_attribute_keygen(params);
     // is the h random ? the same for all signatures ?
     let h = hash_g1("SPh");
@@ -124,13 +124,13 @@ pub fn issue_membership_signatures(
     let sp_sk = sp_key_pair.secret_key();
     let h_sp_sky = h * sp_sk.ys[0];
 
-    let signatures: HashMap<RawAttribute, G1Projective> = phi
+    let signatures: HashMap<RawAttribute, Signature> = phi
         .iter()
         .zip(vec![h * sp_sk.x; phi.len()].iter())
         .map(|(attr, h_sp_skx)| {
             (
                 attr.clone(), // is it possible to avoid clones ?
-                h_sp_skx + (h_sp_sky * (Attribute::from(attr.clone()))),
+                Signature(h, h_sp_skx + (h_sp_sky * (Attribute::from(attr.clone())))),
             )
         })
         .collect();
@@ -288,18 +288,6 @@ mod tests {
     use crate::scheme::setup::setup;
 
     use super::*;
-
-    #[test]
-    fn tdd() {
-        let params = setup(1).unwrap();
-
-        let mut phi = Vec::new();
-        phi.push(RawAttribute::Number(0));
-        phi.push(RawAttribute::Number(1));
-        phi.push(RawAttribute::Number(2));
-
-        let signatures = issue_membership_signatures(&params, &phi);
-    }
 
     #[test]
     fn theta_bytes_roundtrip() {
