@@ -16,10 +16,9 @@ use core::ops::Neg;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
-use bls12_381::{G1Affine, G1Projective, G2Prepared, G2Projective, multi_miller_loop, Scalar};
+use bls12_381::{multi_miller_loop, G1Affine, G1Projective, G2Prepared, G2Projective, Scalar};
 use group::{Curve, Group};
 
-use crate::Attribute;
 use crate::error::{CoconutError, Result};
 use crate::proofs::ProofKappaNu;
 use crate::scheme::setup::Parameters;
@@ -27,9 +26,11 @@ use crate::scheme::Signature;
 use crate::scheme::VerificationKey;
 use crate::traits::{Base58, Bytable};
 use crate::utils::{try_deserialize_g1_projective, try_deserialize_g2_projective};
+use crate::Attribute;
 
 // TODO NAMING: this whole thing
 // Theta
+// also check verification_set_membership
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Theta {
@@ -72,11 +73,8 @@ impl TryFrom<&[u8]> for Theta {
 
 impl Theta {
     fn verify_proof(&self, params: &Parameters, verification_key: &VerificationKey) -> bool {
-        self.pi_v.verify(
-            params,
-            verification_key,
-            &self.blinded_message,
-        )
+        self.pi_v
+            .verify(params, verification_key, &self.blinded_message)
     }
 
     // TODO: perhaps also include pi_v.len()?
@@ -122,10 +120,10 @@ pub fn compute_kappa(
     params.gen2() * blinding_factor
         + verification_key.alpha
         + private_attributes
-        .iter()
-        .zip(verification_key.beta.iter())
-        .map(|(priv_attr, beta_i)| beta_i * priv_attr)
-        .sum::<G2Projective>()
+            .iter()
+            .zip(verification_key.beta.iter())
+            .map(|(priv_attr, beta_i)| beta_i * priv_attr)
+            .sum::<G2Projective>()
 }
 
 pub fn prove_credential(
@@ -159,8 +157,12 @@ pub fn prove_credential(
     // Thus, we need kappa which allows us to verify sigma'. In particular,
     // kappa is computed on m as input, but thanks to the use or random value r,
     // it does not reveal any information about m.
-    let blinded_message = compute_kappa(params, verification_key, private_attributes, sign_blinding_factor);
-
+    let blinded_message = compute_kappa(
+        params,
+        verification_key,
+        private_attributes,
+        sign_blinding_factor,
+    );
 
     let pi_v = ProofKappaNu::construct(
         params,
@@ -239,11 +241,11 @@ pub fn verify(
 ) -> bool {
     let kappa = (verification_key.alpha
         + public_attributes
-        .iter()
-        .zip(verification_key.beta.iter())
-        .map(|(m_i, b_i)| b_i * m_i)
-        .sum::<G2Projective>())
-        .to_affine();
+            .iter()
+            .zip(verification_key.beta.iter())
+            .map(|(m_i, b_i)| b_i * m_i)
+            .sum::<G2Projective>())
+    .to_affine();
 
     check_bilinear_pairing(
         &sig.0.to_affine(),
@@ -277,7 +279,7 @@ mod tests {
             &signature,
             &private_attributes,
         )
-            .unwrap();
+        .unwrap();
 
         let bytes = theta.to_bytes();
         assert_eq!(Theta::try_from(bytes.as_slice()).unwrap(), theta);
@@ -293,7 +295,7 @@ mod tests {
             &signature,
             &private_attributes,
         )
-            .unwrap();
+        .unwrap();
 
         let bytes = theta.to_bytes();
         assert_eq!(Theta::try_from(bytes.as_slice()).unwrap(), theta);
