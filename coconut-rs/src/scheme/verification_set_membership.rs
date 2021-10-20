@@ -112,12 +112,10 @@ impl Bytable for Theta {
 
 impl Base58 for Theta {}
 
-pub fn issue_membership_signatures(params: &Parameters) -> HashMap<RawAttribute, G1Projective> {
-    let mut phi = Vec::new();
-    phi.push(RawAttribute::Number(0));
-    phi.push(RawAttribute::Number(1));
-    phi.push(RawAttribute::Number(2));
-
+pub fn issue_membership_signatures(
+    params: &Parameters,
+    phi: &[RawAttribute],
+) -> HashMap<RawAttribute, G1Projective> {
     let sp_key_pair = single_attribute_keygen(params);
     // is the h random ? the same for all signatures ?
     let h = hash_g1("SPh");
@@ -293,9 +291,14 @@ mod tests {
 
     #[test]
     fn tdd() {
-        let mut params = setup(1).unwrap();
+        let params = setup(1).unwrap();
 
-        issue_membership_signatures(&params);
+        let mut phi = Vec::new();
+        phi.push(RawAttribute::Number(0));
+        phi.push(RawAttribute::Number(1));
+        phi.push(RawAttribute::Number(2));
+
+        let signatures = issue_membership_signatures(&params, &phi);
     }
 
     #[test]

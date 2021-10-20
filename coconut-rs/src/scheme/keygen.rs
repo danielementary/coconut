@@ -433,6 +433,7 @@ pub fn keygen(params: &Parameters) -> KeyPair {
 /// Generate a single keypair ((x, y), (g2^x, g2^y)).
 /// It can be used by service providers when issuing signatures
 pub fn single_attribute_keygen(params: &Parameters) -> KeyPair {
+    // alternative without params ?
     let x = params.random_scalar();
     let ys = params.n_random_scalars(1);
 
