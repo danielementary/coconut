@@ -14,7 +14,10 @@
 
 use core::iter::Sum;
 use core::ops::Mul;
+
 use std::convert::TryInto;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 
 use bls12_381::hash_to_curve::{ExpandMsgXmd, HashToCurve, HashToField};
 use bls12_381::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar};
@@ -25,28 +28,12 @@ use crate::scheme::setup::Parameters;
 use crate::scheme::SignerIndex;
 
 //copied from cli-demo to be used as hashable type
-#[derive(Clone)]
-enum RawAttribute {
+pub type Attribute = Scalar;
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub enum RawAttribute {
     Text(String),
     Number(u64),
-}
-
-fn hash_to_scalar<M>(msg: M) -> Attribute
-where
-    M: AsRef<[u8]>,
-{
-    let mut h = Sha256::new();
-    h.update(msg);
-    let digest = h.finalize();
-
-    let mut bytes = [0u8; 64];
-    let pad_size = 64usize
-        .checked_sub(<Sha256 as Digest>::OutputSize::to_usize())
-        .unwrap_or_default();
-
-    bytes[pad_size..].copy_from_slice(&digest);
-
-    Attribute::from_bytes_wide(&bytes)
 }
 
 impl From<RawAttribute> for Attribute {
