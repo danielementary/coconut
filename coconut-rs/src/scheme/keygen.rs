@@ -22,15 +22,15 @@ use bls12_381::{G2Projective, Scalar};
 use group::Curve;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::Base58;
 use crate::error::{CoconutError, Result};
 use crate::scheme::aggregation::aggregate_verification_keys;
 use crate::scheme::setup::Parameters;
 use crate::scheme::SignerIndex;
 use crate::traits::Bytable;
 use crate::utils::{
-    Polynomial, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
+    try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec, Polynomial,
 };
+use crate::Base58;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -220,13 +220,13 @@ impl<'a> Mul<Scalar> for &'a VerificationKey {
 }
 
 impl<T> Sum<T> for VerificationKey
-    where
-        T: Borrow<VerificationKey>,
+where
+    T: Borrow<VerificationKey>,
 {
     #[inline]
     fn sum<I>(iter: I) -> Self
-        where
-            I: Iterator<Item=T>,
+    where
+        I: Iterator<Item = T>,
     {
         let mut peekable = iter.peekable();
         let head_attributes = match peekable.peek() {
@@ -419,6 +419,22 @@ pub fn keygen(params: &Parameters) -> KeyPair {
 
     let x = params.random_scalar();
     let ys = params.n_random_scalars(attributes);
+
+    let secret_key = SecretKey { x, ys };
+    let verification_key = secret_key.verification_key(params);
+
+    KeyPair {
+        secret_key,
+        verification_key,
+        index: None,
+    }
+}
+
+/// Generate a single keypair ((x, y), (g2^x, g2^y)).
+/// It can be used by service providers when issuing signatures
+pub fn single_attribute_keygen(params: &Parameters) -> KeyPair {
+    let x = params.random_scalar();
+    let ys = params.n_random_scalars(1);
 
     let secret_key = SecretKey { x, ys };
     let verification_key = secret_key.verification_key(params);
