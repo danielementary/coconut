@@ -1,8 +1,8 @@
 use crate::{
     aggregate_signature_shares, aggregate_verification_keys, blind_sign, elgamal_keygen,
-    issue_membership_signatures, prepare_blind_sign, prove_credential, setup, ttp_keygen,
-    utils::RawAttribute, verify_credential, CoconutError, Signature, SignatureShare,
-    VerificationKey,
+    issue_membership_signatures, prepare_blind_sign, prove_credential,
+    prove_credential_and_set_membership, setup, ttp_keygen, utils::RawAttribute, verify_credential,
+    CoconutError, Signature, SignatureShare, VerificationKey,
 };
 
 #[test]
