@@ -549,10 +549,9 @@ impl ProofKappaNu {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct SetMembershipProof {
-    cm_prime: Scalar,
     kappa_1_prime: G2Projective,
     kappa_2_prime: G2Projective,
-    s_attributes: Vec<Scalar>,
+    s_mi: Vec<Scalar>,
     s_r1: Scalar,
     s_r2: Scalar,
 }
@@ -563,6 +562,8 @@ impl SetMembershipProof {
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
         private_attributes: &[Attribute],
+        r1: &Scalar,
+        kappa_1: &G2Projective,
         r2: &Scalar,
         kappa_2: &G2Projective,
     ) -> Self {
@@ -571,7 +572,7 @@ impl SetMembershipProof {
         let r_r2 = params.random_scalar();
         let r_mi = params.n_random_scalars(private_attributes.len());
 
-        // kappa_1' = g2 * r_r1 + X_p + Y_p * r_mi[0]
+        // kappa_1' = g2 * r_r1 + alpha_P + beta_P * r_mi[0]
         let kappa_1_prime = params.gen2() * r_r1
             + sp_verification_key.alpha
             + sp_verification_key.beta[0] * r_mi[0];
@@ -591,22 +592,32 @@ impl SetMembershipProof {
             .map(|beta_i| beta_i.to_bytes())
             .collect::<Vec<_>>();
 
+        // compute challenge: H(kappa_1', kappa_2', g2, alpha_P, beta_P, alpha, betas)
         let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            std::iter::once(params.gen2().to_bytes().as_ref())
-                .chain(std::iter::once(kappa_2.to_bytes().as_ref())) //kappa
+            std::iter::once(kappa_1_prime.to_bytes().as_ref())
+                .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref()))
+                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
+                .chain(std::iter::once(
+                    sp_verification_key.alpha.to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(
+                    sp_verification_key.beta[0].to_bytes().as_ref(),
+                ))
                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(beta_bytes.iter().map(|b| b.as_ref()))
-                .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref())),
+                .chain(beta_bytes.iter().map(|b| b.as_ref())),
         );
 
         // responses
+        let s_r1 = produce_response(&r_r1, &challenge, &r1);
         let s_r2 = produce_response(&r_r2, &challenge, &r2);
         let s_mi = produce_responses(&r_mi, &challenge, private_attributes);
 
-        ProofKappaNu {
-            challenge,
-            response_attributes,
-            response_blinder,
+        SetMembershipProof {
+            kappa_1_prime,
+            kappa_2_prime,
+            s_mi,
+            s_r1,
+            s_r2,
         }
     }
 
