@@ -21,7 +21,7 @@ use std::convert::TryInto;
 use bls12_381::{multi_miller_loop, G1Affine, G1Projective, G2Prepared, G2Projective, Scalar};
 
 use crate::error::{CoconutError, Result};
-use crate::proofs::ProofKappaNu;
+use crate::proofs::SetMembershipProof;
 use crate::scheme::keygen::single_attribute_keygen;
 use crate::scheme::setup::Parameters;
 use crate::scheme::verification::compute_kappa;
@@ -41,26 +41,14 @@ pub struct SetMembershipTheta {
     pub pi: SetMembershipProof,
 }
 
-#[derive(Debug)]
-#[cfg_attr(test, derive(PartialEq))]
-pub struct SetMembershipProof {
-    cm_prime: Scalar,
-    kappa_1_prime: G2Projective,
-    kappa_2_prime: G2Projective,
-    s_attributes: Vec<Scalar>,
-    s_o: Scalar,
-    s_r1: Scalar,
-    s_r2: Scalar,
-}
-
 impl TryFrom<&[u8]> for SetMembershipTheta {
     type Error = CoconutError;
 
     fn try_from(bytes: &[u8]) -> Result<SetMembershipTheta> {
-        if bytes.len() < 192 {
+        if bytes.len() < 384 {
             return Err(
                 CoconutError::Deserialization(
-                    format!("Tried to deserialize theta with insufficient number of bytes, expected >= 240, got {}", bytes.len()),
+                    format!("Tried to deserialize theta with insufficient number of bytes, expected >= 384, got {}", bytes.len()),
                 ));
         }
 
@@ -80,7 +68,7 @@ impl TryFrom<&[u8]> for SetMembershipTheta {
 
         let sigma_prime = Signature::try_from(&bytes[288..384])?;
 
-        let pi = ProofKappaNu::from_bytes(&bytes[384..])?;
+        let pi = SetMembershipProof::from_bytes(&bytes[384..])?;
 
         Ok(SetMembershipTheta {
             kappa_1,
@@ -92,33 +80,7 @@ impl TryFrom<&[u8]> for SetMembershipTheta {
     }
 }
 
-impl SetMembershipTheta {
-    fn verify_proof(&self, params: &Parameters, verification_key: &VerificationKey) -> bool {
-        self.pi
-            .verify(params, verification_key, &self.blinded_message)
-    }
-
-    // TODO: perhaps also include pi_v.len()?
-    // to be determined once we implement serde to make sure its 1:1 compatible
-    // with bincode
-    // kappa || nu || credential || pi_v
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let blinded_message_bytes = self.blinded_message.to_affine().to_compressed();
-        let credential_bytes = self.credential.to_bytes();
-        let proof_bytes = self.pi_v.to_bytes();
-
-        let mut bytes = Vec::with_capacity(192 + proof_bytes.len());
-        bytes.extend_from_slice(&blinded_message_bytes);
-        bytes.extend_from_slice(&credential_bytes);
-        bytes.extend_from_slice(&proof_bytes);
-
-        bytes
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<Theta> {
-        Theta::try_from(bytes)
-    }
-}
+impl SetMembershipTheta {}
 
 pub fn issue_membership_signatures(
     params: &Parameters,
@@ -146,7 +108,8 @@ pub fn issue_membership_signatures(
     signatures
 }
 
-pub fn prove_credential(
+// TODO
+pub fn prove_credential_and_set_membership(
     params: &Parameters,
     verification_key: &VerificationKey,
     signature: &Signature,
@@ -184,4 +147,14 @@ pub fn prove_credential(
     //     credential: signature_prime,
     //     pi_v,
     // })
+}
+
+// TODO
+pub fn verify_set_membership_credential(
+    params: &Parameters,
+    verification_key: &VerificationKey,
+    theta: &SetMembershipTheta,
+    public_attributes: &[Attribute],
+) -> bool {
+    false
 }

@@ -32,7 +32,7 @@ use crate::utils::{hash_g1, try_deserialize_scalar, try_deserialize_scalar_vec};
 use crate::{elgamal, Attribute, ElGamalKeyPair, PublicKey};
 
 // as per the reference python implementation
-type ChallengeDigest = Sha256;
+pub type ChallengeDigest = Sha256;
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -50,7 +50,7 @@ pub struct ProofCmCs {
 // note2: G1 and G2 elements are using their compressed representations
 // and as per the bls12-381 library all elements are using big-endian form
 /// Generates a Scalar [or Fp] challenge by hashing a number of elliptic curve points.  
-fn compute_challenge<D, I, B>(iter: I) -> Scalar
+pub fn compute_challenge<D, I, B>(iter: I) -> Scalar
 where
     D: Digest,
     I: Iterator<Item = B>,
@@ -474,6 +474,180 @@ impl ProofKappaNu {
                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
                 .chain(beta_bytes.iter().map(|b| b.as_ref()))
                 .chain(std::iter::once(commitment_kappa.to_bytes().as_ref())),
+        );
+
+        challenge == self.challenge
+    }
+
+    // challenge || rm.len() || rm || rt
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        let attributes_len = self.response_attributes.len() as u64;
+
+        let mut bytes = Vec::with_capacity(8 + (attributes_len + 1) as usize * 32);
+
+        bytes.extend_from_slice(&self.challenge.to_bytes());
+
+        bytes.extend_from_slice(&attributes_len.to_le_bytes());
+        for rm in &self.response_attributes {
+            bytes.extend_from_slice(&rm.to_bytes());
+        }
+
+        bytes.extend_from_slice(&self.response_blinder.to_bytes());
+
+        bytes
+    }
+
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        // at the very minimum there must be a single attribute being proven
+        if bytes.len() < 32 * 3 + 8 || (bytes.len() - 8) % 32 != 0 {
+            return Err(CoconutError::DeserializationInvalidLength {
+                actual: bytes.len(),
+                modulus_target: bytes.len() - 8,
+                modulus: 32,
+                object: "kappa and nu".to_string(),
+                target: 32 * 3 + 8,
+            });
+        }
+
+        let challenge_bytes = bytes[..32].try_into().unwrap();
+        let challenge = try_deserialize_scalar(
+            &challenge_bytes,
+            CoconutError::Deserialization("Failed to deserialize challenge".to_string()),
+        )?;
+
+        let rm_len = u64::from_le_bytes(bytes[32..40].try_into().unwrap());
+        if bytes[40..].len() != (rm_len + 1) as usize * 32 {
+            return Err(
+                CoconutError::Deserialization(
+                    format!("Tried to deserialize proof of kappa and nu with insufficient number of bytes provided, expected {} got {}.", (rm_len + 1) as usize * 32, bytes[40..].len())
+                )
+            );
+        }
+
+        let rm_end = 40 + rm_len as usize * 32;
+        let response_attributes = try_deserialize_scalar_vec(
+            rm_len,
+            &bytes[40..rm_end],
+            CoconutError::Deserialization("Failed to deserialize attributes response".to_string()),
+        )?;
+
+        let blinder_bytes = bytes[rm_end..].try_into().unwrap();
+        let response_blinder = try_deserialize_scalar(
+            &blinder_bytes,
+            CoconutError::Deserialization("failed to deserialize the blinder".to_string()),
+        )?;
+
+        Ok(ProofKappaNu {
+            challenge,
+            response_attributes,
+            response_blinder,
+        })
+    }
+}
+
+// TODO do like proofkappanu for setmembershipproof
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct SetMembershipProof {
+    cm_prime: Scalar,
+    kappa_1_prime: G2Projective,
+    kappa_2_prime: G2Projective,
+    s_attributes: Vec<Scalar>,
+    s_r1: Scalar,
+    s_r2: Scalar,
+}
+
+impl SetMembershipProof {
+    pub(crate) fn construct(
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+        private_attributes: &[Attribute],
+        r2: &Scalar,
+        kappa_2: &G2Projective,
+    ) -> Self {
+        // pick random witnesses
+        let r_r1 = params.random_scalar();
+        let r_r2 = params.random_scalar();
+        let r_mi = params.n_random_scalars(private_attributes.len());
+
+        // kappa_1' = g2 * r_r1 + X_p + Y_p * r_mi[0]
+        let kappa_1_prime = params.gen2() * r_r1
+            + sp_verification_key.alpha
+            + sp_verification_key.beta[0] * r_mi[0];
+
+        // kappa_2' = g2 * r_r2 + alpha + beta[0] * r_mi[0] + ... + beta[i] * r_mi[i]
+        let kappa_2_prime = params.gen2() * r_r2
+            + verification_key.alpha
+            + r_mi
+                .iter()
+                .zip(verification_key.beta.iter())
+                .map(|(r_mi, beta_i)| beta_i * r_mi)
+                .sum::<G2Projective>();
+
+        let beta_bytes = verification_key
+            .beta
+            .iter()
+            .map(|beta_i| beta_i.to_bytes())
+            .collect::<Vec<_>>();
+
+        let challenge = compute_challenge::<ChallengeDigest, _, _>(
+            std::iter::once(params.gen2().to_bytes().as_ref())
+                .chain(std::iter::once(kappa_2.to_bytes().as_ref())) //kappa
+                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
+                .chain(beta_bytes.iter().map(|b| b.as_ref()))
+                .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref())),
+        );
+
+        // responses
+        let s_r2 = produce_response(&r_r2, &challenge, &r2);
+        let s_mi = produce_responses(&r_mi, &challenge, private_attributes);
+
+        ProofKappaNu {
+            challenge,
+            response_attributes,
+            response_blinder,
+        }
+    }
+
+    pub(crate) fn private_attributes(&self) -> usize {
+        self.response_attributes.len()
+    }
+
+    pub(crate) fn verify(
+        &self,
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        kappa: &G2Projective,
+    ) -> bool {
+        let beta_bytes = verification_key
+            .beta
+            .iter()
+            .map(|beta_i| beta_i.to_bytes())
+            .collect::<Vec<_>>();
+
+        // re-compute witnesses commitments
+        // Aw = (c * kappa) + (rt * g2) + ((1 - c) * alpha) + (rm[0] * beta[0]) + ... + (rm[i] * beta[i])
+        let kappa_2_prime = kappa * self.challenge
+            + params.gen2() * self.response_blinder
+            + verification_key.alpha * (Scalar::one() - self.challenge)
+            + self
+                .response_attributes
+                .iter()
+                .zip(verification_key.beta.iter())
+                .map(|(priv_attr, beta_i)| beta_i * priv_attr)
+                .sum::<G2Projective>();
+
+        // Bw = (c * nu) + (rt * h)
+        // let commitment_blinder = nu * self.challenge + signature.sig1() * self.response_blinder;
+
+        // compute the challenge
+        let challenge = compute_challenge::<ChallengeDigest, _, _>(
+            std::iter::once(params.gen2().to_bytes().as_ref())
+                .chain(std::iter::once(kappa.to_bytes().as_ref())) //kappa
+                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
+                .chain(beta_bytes.iter().map(|b| b.as_ref()))
+                .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref())),
         );
 
         challenge == self.challenge
