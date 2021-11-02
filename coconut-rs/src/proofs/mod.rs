@@ -549,6 +549,7 @@ impl ProofKappaNu {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct SetMembershipProof {
+    challenge: Scalar,
     kappa_1_prime: G2Projective,
     kappa_2_prime: G2Projective,
     s_mi: Vec<Scalar>,
@@ -613,6 +614,7 @@ impl SetMembershipProof {
         let s_mi = produce_responses(&r_mi, &challenge, private_attributes);
 
         SetMembershipProof {
+            challenge,
             kappa_1_prime,
             kappa_2_prime,
             s_mi,
@@ -629,7 +631,9 @@ impl SetMembershipProof {
         &self,
         params: &Parameters,
         verification_key: &VerificationKey,
-        kappa: &G2Projective,
+        sp_verification_key: &VerificationKey,
+        kappa_1: &G2Projective,
+        kappa_2: &G2Projective,
     ) -> bool {
         let beta_bytes = verification_key
             .beta
@@ -637,31 +641,22 @@ impl SetMembershipProof {
             .map(|beta_i| beta_i.to_bytes())
             .collect::<Vec<_>>();
 
-        // re-compute witnesses commitments
-        // Aw = (c * kappa) + (rt * g2) + ((1 - c) * alpha) + (rm[0] * beta[0]) + ... + (rm[i] * beta[i])
-        let kappa_2_prime = kappa * self.challenge
-            + params.gen2() * self.response_blinder
-            + verification_key.alpha * (Scalar::one() - self.challenge)
-            + self
-                .response_attributes
+        let kappa_1_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_1_prime;
+        let kappa_1_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_1) * self.challenge
+            + params.gen2() * self.s_r1
+            + sp_verification_key.beta[0] * self.s_mi[0];
+
+        let kappa_2_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_2_prime;
+        let kappa_2_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_2) * self.challenge
+            + params.gen2() * self.s_r2
+            + verification_key
+                .beta
                 .iter()
-                .zip(verification_key.beta.iter())
-                .map(|(priv_attr, beta_i)| beta_i * priv_attr)
+                .zip(self.s_mi.iter())
+                .map(|(beta, s_m)| beta * s_m)
                 .sum::<G2Projective>();
 
-        // Bw = (c * nu) + (rt * h)
-        // let commitment_blinder = nu * self.challenge + signature.sig1() * self.response_blinder;
-
-        // compute the challenge
-        let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            std::iter::once(params.gen2().to_bytes().as_ref())
-                .chain(std::iter::once(kappa.to_bytes().as_ref())) //kappa
-                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(beta_bytes.iter().map(|b| b.as_ref()))
-                .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref())),
-        );
-
-        challenge == self.challenge
+        kappa_1_lhs == kappa_1_rhs && kappa_2_lhs == kappa_1_rhs
     }
 
     // challenge || rm.len() || rm || rt
