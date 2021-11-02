@@ -622,7 +622,7 @@ impl SetMembershipProof {
     }
 
     pub(crate) fn private_attributes(&self) -> usize {
-        self.response_attributes.len()
+        self.s_mi.len()
     }
 
     pub(crate) fn verify(
