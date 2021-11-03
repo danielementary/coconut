@@ -18,21 +18,30 @@ use std::borrow::Borrow;
 use std::convert::TryInto;
 
 use bls12_381::{G1Projective, G2Projective, Scalar};
+use group::{Curve, GroupEncoding};
+
+use std::mem::size_of;
+
 use digest::generic_array::typenum::Unsigned;
 use digest::Digest;
-use group::GroupEncoding;
 use itertools::izip;
 use sha2::Sha256;
 
 use crate::elgamal::Ciphertext;
 use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
-use crate::scheme::{Signature, VerificationKey};
-use crate::utils::{hash_g1, try_deserialize_scalar, try_deserialize_scalar_vec};
-use crate::{elgamal, Attribute, ElGamalKeyPair, PublicKey};
+use crate::scheme::VerificationKey;
+use crate::utils::{
+    hash_g1, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
+};
+use crate::{elgamal, Attribute, ElGamalKeyPair};
 
 // as per the reference python implementation
 pub type ChallengeDigest = Sha256;
+
+const G2PROJ_SIZE: usize = size_of::<G2Projective>();
+const USIZE_SIZE: usize = size_of::<usize>();
+const SCALAR_SIZE: usize = size_of::<Scalar>();
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -545,11 +554,10 @@ impl ProofKappaNu {
     }
 }
 
-// TODO do like proofkappanu for setmembershipproof
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct SetMembershipProof {
-    challenge: Scalar,
+    challenge: Scalar, // to remove later after testing
     kappa_1_prime: G2Projective,
     kappa_2_prime: G2Projective,
     s_mi: Vec<Scalar>,
@@ -641,13 +649,31 @@ impl SetMembershipProof {
             .map(|beta_i| beta_i.to_bytes())
             .collect::<Vec<_>>();
 
+        // recompute challenge: H(kappa_1', kappa_2', g2, alpha_P, beta_P, alpha, betas)
+        let challenge = compute_challenge::<ChallengeDigest, _, _>(
+            std::iter::once(self.kappa_1_prime.to_bytes().as_ref())
+                .chain(std::iter::once(self.kappa_2_prime.to_bytes().as_ref()))
+                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
+                .chain(std::iter::once(
+                    sp_verification_key.alpha.to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(
+                    sp_verification_key.beta[0].to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
+                .chain(beta_bytes.iter().map(|b| b.as_ref())),
+        );
+
+        // to remove after test
+        assert_eq!(challenge, self.challenge);
+
         let kappa_1_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_1_prime;
-        let kappa_1_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_1) * self.challenge
+        let kappa_1_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_1) * challenge
             + params.gen2() * self.s_r1
             + sp_verification_key.beta[0] * self.s_mi[0];
 
         let kappa_2_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_2_prime;
-        let kappa_2_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_2) * self.challenge
+        let kappa_2_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_2) * challenge
             + params.gen2() * self.s_r2
             + verification_key
                 .beta
@@ -659,68 +685,102 @@ impl SetMembershipProof {
         kappa_1_lhs == kappa_1_rhs && kappa_2_lhs == kappa_1_rhs
     }
 
-    // challenge || rm.len() || rm || rt
+    // kappa_1_prime || kappa_2_prime || s_mi.len() || s_mi || s_r1 || s_r2 || challenge
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        let attributes_len = self.response_attributes.len() as u64;
+        let total_size = 2 * G2PROJ_SIZE
+            + USIZE_SIZE
+            + self.s_mi.len() * SCALAR_SIZE
+            + 2 * SCALAR_SIZE
+            + SCALAR_SIZE;
 
-        let mut bytes = Vec::with_capacity(8 + (attributes_len + 1) as usize * 32);
+        let mut bytes = Vec::with_capacity(total_size);
 
-        bytes.extend_from_slice(&self.challenge.to_bytes());
+        bytes.extend_from_slice(&self.kappa_1_prime.to_affine().to_compressed());
+        bytes.extend_from_slice(&self.kappa_2_prime.to_affine().to_compressed());
 
-        bytes.extend_from_slice(&attributes_len.to_le_bytes());
-        for rm in &self.response_attributes {
-            bytes.extend_from_slice(&rm.to_bytes());
+        bytes.extend_from_slice(&self.s_mi.len().to_le_bytes());
+        for s_mi in &self.s_mi {
+            bytes.extend_from_slice(&s_mi.to_bytes());
         }
 
-        bytes.extend_from_slice(&self.response_blinder.to_bytes());
+        bytes.extend_from_slice(&self.s_r1.to_bytes());
+        bytes.extend_from_slice(&self.s_r2.to_bytes());
+
+        bytes.extend_from_slice(&self.challenge.to_bytes());
 
         bytes
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        // at the very minimum there must be a single attribute being proven
-        if bytes.len() < 32 * 3 + 8 || (bytes.len() - 8) % 32 != 0 {
+        let min_size = 2 * G2PROJ_SIZE + USIZE_SIZE + SCALAR_SIZE + 2 * SCALAR_SIZE + SCALAR_SIZE;
+
+        if bytes.len() < min_size || (bytes.len() - min_size) % SCALAR_SIZE != 0 {
             return Err(CoconutError::DeserializationInvalidLength {
                 actual: bytes.len(),
-                modulus_target: bytes.len() - 8,
-                modulus: 32,
-                object: "kappa and nu".to_string(),
-                target: 32 * 3 + 8,
+                modulus_target: bytes.len() - min_size,
+                modulus: SCALAR_SIZE,
+                object: "kappa_1', kappa_2', s_mi, s_r1, s_r2".to_string(),
+                target: min_size,
             });
         }
 
-        let challenge_bytes = bytes[..32].try_into().unwrap();
+        let kappa_1_prime_bytes = bytes[..G2PROJ_SIZE].try_into().unwrap();
+        let p = G2PROJ_SIZE;
+
+        let kappa_1_prime = try_deserialize_g2_projective(
+            &kappa_1_prime_bytes,
+            CoconutError::Deserialization("failed to deserialize kappa_1'".to_string()),
+        )?;
+
+        let kappa_2_prime_bytes = bytes[p..p + G2PROJ_SIZE].try_into().unwrap();
+        p += G2PROJ_SIZE;
+
+        let kappa_2_prime = try_deserialize_g2_projective(
+            &kappa_2_prime_bytes,
+            CoconutError::Deserialization("failed to deserialize kappa_2'".to_string()),
+        )?;
+
+        let s_mi_len = u64::from_le_bytes(bytes[p..p + USIZE_SIZE].try_into().unwrap());
+        p += USIZE_SIZE;
+
+        let p_temp = p + (s_mi_len as usize) * SCALAR_SIZE;
+        let s_mi = try_deserialize_scalar_vec(
+            s_mi_len,
+            &bytes[p..p_temp],
+            CoconutError::Deserialization("Failed to deserialize s_mi".to_string()),
+        )?;
+        p = p_temp;
+
+        let s_r1_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let s_r1 = try_deserialize_scalar(
+            &s_r1_bytes,
+            CoconutError::Deserialization("failed to deserialize the s_r1".to_string()),
+        )?;
+
+        let s_r2_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let s_r2 = try_deserialize_scalar(
+            &s_r2_bytes,
+            CoconutError::Deserialization("failed to deserialize the s_r2".to_string()),
+        )?;
+
+        let challenge_bytes = bytes[p..].try_into().unwrap();
+
         let challenge = try_deserialize_scalar(
             &challenge_bytes,
-            CoconutError::Deserialization("Failed to deserialize challenge".to_string()),
+            CoconutError::Deserialization("failed to deserialize the challenge".to_string()),
         )?;
 
-        let rm_len = u64::from_le_bytes(bytes[32..40].try_into().unwrap());
-        if bytes[40..].len() != (rm_len + 1) as usize * 32 {
-            return Err(
-                CoconutError::Deserialization(
-                    format!("Tried to deserialize proof of kappa and nu with insufficient number of bytes provided, expected {} got {}.", (rm_len + 1) as usize * 32, bytes[40..].len())
-                )
-            );
-        }
-
-        let rm_end = 40 + rm_len as usize * 32;
-        let response_attributes = try_deserialize_scalar_vec(
-            rm_len,
-            &bytes[40..rm_end],
-            CoconutError::Deserialization("Failed to deserialize attributes response".to_string()),
-        )?;
-
-        let blinder_bytes = bytes[rm_end..].try_into().unwrap();
-        let response_blinder = try_deserialize_scalar(
-            &blinder_bytes,
-            CoconutError::Deserialization("failed to deserialize the blinder".to_string()),
-        )?;
-
-        Ok(ProofKappaNu {
+        Ok(SetMembershipProof {
             challenge,
-            response_attributes,
-            response_blinder,
+            kappa_1_prime,
+            kappa_2_prime,
+            s_mi,
+            s_r1,
+            s_r2,
         })
     }
 }
