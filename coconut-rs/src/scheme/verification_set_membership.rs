@@ -108,53 +108,53 @@ pub fn issue_membership_signatures(
     signatures
 }
 
-// TODO
-pub fn prove_credential_and_set_membership(
-    params: &Parameters,
-    verification_key: &VerificationKey,
-    signature: &Signature,
-    private_attributes: &[Attribute],
-) -> Result<Theta> {
-    if private_attributes.is_empty() {
-        return Err(CoconutError::Verification(
-            "Tried to prove a credential with an empty set of private attributes".to_string(),
-        ));
-    }
+// // TODO
+// pub fn prove_credential_and_set_membership(
+//     params: &Parameters,
+//     verification_key: &VerificationKey,
+//     signature: &Signature,
+//     private_attributes: &[Attribute],
+// ) -> Result<Theta> {
+//     if private_attributes.is_empty() {
+//         return Err(CoconutError::Verification(
+//             "Tried to prove a credential with an empty set of private attributes".to_string(),
+//         ));
+//     }
 
-    if private_attributes.len() > verification_key.beta.len() {
-        return Err(
-            CoconutError::Verification(
-                format!("Tried to prove a credential for higher than supported by the provided verification key number of attributes (max: {}, requested: {})",
-                        verification_key.beta.len(),
-                        private_attributes.len()
-                )));
-    }
+//     if private_attributes.len() > verification_key.beta.len() {
+//         return Err(
+//             CoconutError::Verification(
+//                 format!("Tried to prove a credential for higher than supported by the provided verification key number of attributes (max: {}, requested: {})",
+//                         verification_key.beta.len(),
+//                         private_attributes.len()
+//                 )));
+//     }
 
-    let kappa_1 = compute_kappa(params, verification_key, private_attributes, r1);
+//     let kappa_1 = compute_kappa(params, verification_key, private_attributes, r1);
 
-    let kappa_2 = compute_kappa(params, verification_key, private_attributes, r2);
+//     let kappa_2 = compute_kappa(params, verification_key, private_attributes, r2);
 
-    let pi_v = ProofKappaNu::construct(
-        params,
-        verification_key,
-        private_attributes,
-        &sign_blinding_factor,
-        &blinded_message,
-    );
+//     let pi_v = ProofKappaNu::construct(
+//         params,
+//         verification_key,
+//         private_attributes,
+//         &sign_blinding_factor,
+//         &blinded_message,
+//     );
 
-    // Ok(Theta {
-    //     blinded_message,
-    //     credential: signature_prime,
-    //     pi_v,
-    // })
-}
+//     // Ok(Theta {
+//     //     blinded_message,
+//     //     credential: signature_prime,
+//     //     pi_v,
+//     // })
+// }
 
-// TODO
-pub fn verify_set_membership_credential(
-    params: &Parameters,
-    verification_key: &VerificationKey,
-    theta: &SetMembershipTheta,
-    public_attributes: &[Attribute],
-) -> bool {
-    false
-}
+// // TODO
+// pub fn verify_set_membership_credential(
+//     params: &Parameters,
+//     verification_key: &VerificationKey,
+//     theta: &SetMembershipTheta,
+//     public_attributes: &[Attribute],
+// ) -> bool {
+//     false
+// }
