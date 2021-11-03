@@ -19,6 +19,7 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 
 use bls12_381::{multi_miller_loop, G1Affine, G1Projective, G2Prepared, G2Projective, Scalar};
+use group::{Curve, Group};
 
 use crate::error::{CoconutError, Result};
 use crate::proofs::SetMembershipProof;
@@ -27,6 +28,7 @@ use crate::scheme::setup::Parameters;
 use crate::scheme::verification::compute_kappa;
 use crate::scheme::Signature;
 use crate::scheme::VerificationKey;
+use crate::traits::{Base58, Bytable};
 use crate::utils::{hash_g1, RawAttribute};
 use crate::utils::{try_deserialize_g1_projective, try_deserialize_g2_projective};
 use crate::Attribute;
@@ -80,7 +82,64 @@ impl TryFrom<&[u8]> for SetMembershipTheta {
     }
 }
 
-impl SetMembershipTheta {}
+impl SetMembershipTheta {
+    fn verify_proof(
+        &self,
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+        kappa_1: &G2Projective,
+        kappa_2: &G2Projective,
+    ) -> bool {
+        self.pi.verify(
+            params,
+            verification_key,
+            &sp_verification_key,
+            &kappa_1,
+            &kappa_2,
+        )
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let kappa_1_bytes = self.kappa_1.to_affine().to_compressed();
+        let a_prime_bytes = self.a_prime.to_bytes();
+        let kappa_2_bytes = self.kappa_2.to_affine().to_compressed();
+        let sigma_prime_bytes = self.sigma_prime.to_bytes();
+        let pi_bytes = self.pi.to_bytes();
+
+        let mut bytes = Vec::with_capacity(
+            kappa_1_bytes.len()
+                + a_prime_bytes.len()
+                + kappa_2_bytes.len()
+                + sigma_prime_bytes.len()
+                + pi_bytes.len(),
+        );
+
+        bytes.extend_from_slice(&kappa_1_bytes);
+        bytes.extend_from_slice(&a_prime_bytes);
+        bytes.extend_from_slice(&kappa_2_bytes);
+        bytes.extend_from_slice(&sigma_prime_bytes);
+        bytes.extend_from_slice(&pi_bytes);
+
+        bytes
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<SetMembershipTheta> {
+        SetMembershipTheta::try_from(bytes)
+    }
+}
+
+impl Bytable for SetMembershipTheta {
+    fn to_byte_vec(&self) -> Vec<u8> {
+        self.to_bytes()
+    }
+
+    fn try_from_byte_slice(slice: &[u8]) -> Result<Self> {
+        SetMembershipTheta::TryFrom(slice)
+    }
+}
+
+impl Base58 for SetMembershipTheta {}
 
 pub fn issue_membership_signatures(
     params: &Parameters,

@@ -16,7 +16,7 @@ use core::ops::Neg;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
-use bls12_381::{multi_miller_loop, G1Affine, G1Projective, G2Prepared, G2Projective, Scalar};
+use bls12_381::{multi_miller_loop, G1Affine, G2Prepared, G2Projective, Scalar};
 use group::{Curve, Group};
 
 use crate::error::{CoconutError, Result};
@@ -25,7 +25,7 @@ use crate::scheme::setup::Parameters;
 use crate::scheme::Signature;
 use crate::scheme::VerificationKey;
 use crate::traits::{Base58, Bytable};
-use crate::utils::{try_deserialize_g1_projective, try_deserialize_g2_projective};
+use crate::utils::try_deserialize_g2_projective;
 use crate::Attribute;
 
 // TODO NAMING: this whole thing
