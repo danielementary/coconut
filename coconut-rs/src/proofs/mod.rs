@@ -572,9 +572,7 @@ impl SetMembershipProof {
         sp_verification_key: &VerificationKey,
         private_attributes: &[Attribute],
         r1: &Scalar,
-        kappa_1: &G2Projective,
         r2: &Scalar,
-        kappa_2: &G2Projective,
     ) -> Self {
         // pick random witnesses
         let r_r1 = params.random_scalar();
@@ -682,7 +680,7 @@ impl SetMembershipProof {
                 .map(|(beta, s_m)| beta * s_m)
                 .sum::<G2Projective>();
 
-        kappa_1_lhs == kappa_1_rhs && kappa_2_lhs == kappa_1_rhs
+        kappa_1_lhs == kappa_1_rhs && kappa_2_lhs == kappa_2_rhs
     }
 
     // kappa_1_prime || kappa_2_prime || s_mi.len() || s_mi || s_r1 || s_r2 || challenge
@@ -725,7 +723,7 @@ impl SetMembershipProof {
         }
 
         let kappa_1_prime_bytes = bytes[..G2PROJ_SIZE].try_into().unwrap();
-        let p = G2PROJ_SIZE;
+        let mut p = G2PROJ_SIZE;
 
         let kappa_1_prime = try_deserialize_g2_projective(
             &kappa_1_prime_bytes,
