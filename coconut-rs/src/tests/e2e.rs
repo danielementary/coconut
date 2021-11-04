@@ -179,33 +179,32 @@ fn main_set_membership() -> Result<(), CoconutError> {
     attributes.extend_from_slice(&private_attributes);
     attributes.extend_from_slice(&public_attributes);
 
+    let signature =
+        aggregate_signature_shares(&params, &verification_key, &attributes, &signature_shares)?;
+
     // pick the membership signature corresponding to the private attribute
     let membership_signature = membership_signatures
+        .signatures
         .get(&RawAttribute::Number(private_attribute))
         .unwrap();
 
     // Randomize credentials and generate any cryptographic material to verify them
-    let signature =
-        aggregate_signature_shares(&params, &verification_key, &attributes, &signature_shares)?;
-
-    let (r_membership_signature, r1) = membership_signature.randomise(&params);
-    let (r_signature, r2) = signature.randomise(&params);
-
-    // Generate cryptographic material to verify them
     let theta = prove_credential_and_set_membership(
         &params,
         &verification_key,
+        &sp_verification_key,
         &signature,
+        &membership_signature,
         &private_attributes,
     )?;
 
-    // Verify credentials
-    assert!(verify_credential(
-        &params,
-        &verification_key,
-        &theta,
-        &public_attributes,
-    ));
+    // // Verify credentials
+    // assert!(verify_credential(
+    //     &params,
+    //     &verification_key,
+    //     &theta,
+    //     &public_attributes,
+    // ));
 
     Ok(())
 }

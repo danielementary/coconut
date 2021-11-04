@@ -141,10 +141,15 @@ impl Bytable for SetMembershipTheta {
 
 impl Base58 for SetMembershipTheta {}
 
+pub struct MembershipSignatures {
+    pub signatures: HashMap<RawAttribute, Signature>,
+    pub sp_verification_key: VerificationKey,
+}
+
 pub fn issue_membership_signatures(
     params: &Parameters,
     phi: &[RawAttribute],
-) -> HashMap<RawAttribute, Signature> {
+) -> MembershipSignatures {
     let sp_key_pair = single_attribute_keygen(params);
     // is the h random ? the same for all signatures ?
     let h = hash_g1("SPh");
@@ -164,49 +169,61 @@ pub fn issue_membership_signatures(
         })
         .collect();
 
-    signatures
+    let sp_verification_key = sp_key_pair.verification_key();
+
+    MembershipSignatures {
+        signatures,
+        sp_verification_key,
+    }
 }
 
-// // TODO
-// pub fn prove_credential_and_set_membership(
-//     params: &Parameters,
-//     verification_key: &VerificationKey,
-//     signature: &Signature,
-//     private_attributes: &[Attribute],
-// ) -> Result<Theta> {
-//     if private_attributes.is_empty() {
-//         return Err(CoconutError::Verification(
-//             "Tried to prove a credential with an empty set of private attributes".to_string(),
-//         ));
-//     }
+pub fn prove_credential_and_set_membership(
+    params: &Parameters,
+    verification_key: &VerificationKey,
+    sp_verification_key: &VerificationKey,
+    signature: &Signature,
+    membership_signature: &Signature,
+    private_attributes: &[Attribute],
+) -> Result<SetMembershipTheta> {
+    if private_attributes.is_empty() {
+        return Err(CoconutError::Verification(
+            "Tried to prove a credential with an empty set of private attributes".to_string(),
+        ));
+    }
 
-//     if private_attributes.len() > verification_key.beta.len() {
-//         return Err(
-//             CoconutError::Verification(
-//                 format!("Tried to prove a credential for higher than supported by the provided verification key number of attributes (max: {}, requested: {})",
-//                         verification_key.beta.len(),
-//                         private_attributes.len()
-//                 )));
-//     }
+    if private_attributes.len() > verification_key.beta.len() {
+        return Err(
+            CoconutError::Verification(
+                format!("Tried to prove a credential for higher than supported by the provided verification key number of attributes (max: {}, requested: {})",
+                        verification_key.beta.len(),
+                        private_attributes.len()
+                )));
+    }
 
-//     let kappa_1 = compute_kappa(params, verification_key, private_attributes, r1);
+    let (a_prime, r1) = membership_signature.randomise(&params);
+    let (sigma_prime, r2) = signature.randomise(&params);
 
-//     let kappa_2 = compute_kappa(params, verification_key, private_attributes, r2);
+    let kappa_1 = compute_kappa(params, sp_verification_key, private_attributes, r1);
 
-//     let pi_v = ProofKappaNu::construct(
-//         params,
-//         verification_key,
-//         private_attributes,
-//         &sign_blinding_factor,
-//         &blinded_message,
-//     );
+    let kappa_2 = compute_kappa(params, verification_key, private_attributes, r2);
 
-//     // Ok(Theta {
-//     //     blinded_message,
-//     //     credential: signature_prime,
-//     //     pi_v,
-//     // })
-// }
+    let pi = SetMembershipProof::construct(
+        params,
+        verification_key,
+        sp_verification_key,
+        private_attributes,
+        &r1,
+        &r2,
+    );
+
+    Ok(SetMembershipTheta {
+        kappa_1,
+        a_prime,
+        kappa_2,
+        sigma_prime,
+        pi,
+    })
+}
 
 // // TODO
 // pub fn verify_set_membership_credential(
