@@ -140,6 +140,7 @@ impl Bytable for SetMembershipTheta {
 
 impl Base58 for SetMembershipTheta {}
 
+// struct that embeds all set membership signatures and corresponding public key
 pub struct MembershipSignatures {
     pub signatures: HashMap<RawAttribute, Signature>,
     pub sp_verification_key: VerificationKey,
@@ -273,4 +274,33 @@ pub fn verify_set_membership_credential(
         &(theta.sigma_prime.1).to_affine(),
         params.prepared_miller_g2(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::scheme::setup::setup;
+
+    use super::*;
+
+    #[test]
+    fn issue_membership_signatures_len() {
+        let params = setup(1).unwrap();
+
+        let phi_1 = [RawAttribute::Number(0)];
+        let membership_signatures_1 = issue_membership_signatures(&params, &phi_1);
+
+        let phi_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
+        let membership_signatures_2 = issue_membership_signatures(&params, &phi_2);
+
+        let phi_3 = [
+            RawAttribute::Number(0),
+            RawAttribute::Number(1),
+            RawAttribute::Number(2),
+        ];
+        let membership_signatures_3 = issue_membership_signatures(&params, &phi_3);
+
+        assert_eq!(phi_1.len(), membership_signatures_1.signatures.len());
+        assert_eq!(phi_2.len(), membership_signatures_2.signatures.len());
+        assert_eq!(phi_3.len(), membership_signatures_3.signatures.len());
+    }
 }

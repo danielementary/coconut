@@ -808,14 +808,14 @@ mod tests {
 
         let elgamal_keypair = elgamal::elgamal_keygen(&params);
         let private_attributes = params.n_random_scalars(1);
-        let public_attributes = params.n_random_scalars(0);
+        let _public_attributes = params.n_random_scalars(0);
 
         // we don't care about 'correctness' of the proof. only whether we can correctly recover it from bytes
         let cm = G1Projective::random(&mut rng);
         let r = params.random_scalar();
 
         let commitment_hash = compute_commitment_hash(cm);
-        let (attributes_ciphertexts, ephemeral_keys): (Vec<_>, Vec<_>) =
+        let (attributes_ciphertexts, _ephemeral_keys): (Vec<_>, Vec<_>) =
             compute_attribute_encryption(
                 &params,
                 private_attributes.as_ref(),
@@ -840,7 +840,7 @@ mod tests {
 
         // 2 public 2 private
         let private_attributes = params.n_random_scalars(2);
-        let public_attributes = params.n_random_scalars(2);
+        let _public_attributes = params.n_random_scalars(2);
         let ephemeral_keys = params.n_random_scalars(2);
 
         let pi_s = ProofCmCs::construct(
@@ -866,7 +866,7 @@ mod tests {
         let s = params.random_scalar();
 
         // we don't care about 'correctness' of the proof. only whether we can correctly recover it from bytes
-        let signature = Signature(params.gen1() * r, params.gen1() * s);
+        let _signature = Signature(params.gen1() * r, params.gen1() * s);
         let private_attributes = params.n_random_scalars(1);
         let r = params.random_scalar();
         let kappa = compute_kappa(&params, &keypair.verification_key(), &private_attributes, r);
