@@ -135,7 +135,7 @@ impl Bytable for SetMembershipTheta {
     }
 
     fn try_from_byte_slice(slice: &[u8]) -> Result<Self> {
-        SetMembershipTheta::TryFrom(slice)
+        SetMembershipTheta::try_from(slice)
     }
 }
 
