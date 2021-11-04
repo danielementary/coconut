@@ -238,6 +238,7 @@ impl SignatureShare {
 
 #[cfg(test)]
 mod tests {
+    use crate::scheme::aggregation::aggregate_signatures;
     use crate::scheme::aggregation::aggregate_verification_keys;
     use crate::scheme::issuance::{blind_sign, prepare_blind_sign, sign};
     use crate::scheme::keygen::{keygen, ttp_keygen};
