@@ -14,23 +14,22 @@
 
 use std::collections::HashMap;
 
-use core::ops::Neg;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
-use bls12_381::{multi_miller_loop, G1Affine, G1Projective, G2Prepared, G2Projective, Scalar};
+use bls12_381::{G2Prepared, G2Projective};
 use group::{Curve, Group};
 
 use crate::error::{CoconutError, Result};
 use crate::proofs::SetMembershipProof;
 use crate::scheme::keygen::single_attribute_keygen;
 use crate::scheme::setup::Parameters;
-use crate::scheme::verification::compute_kappa;
+use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
 use crate::scheme::Signature;
 use crate::scheme::VerificationKey;
 use crate::traits::{Base58, Bytable};
+use crate::utils::try_deserialize_g2_projective;
 use crate::utils::{hash_g1, RawAttribute};
-use crate::utils::{try_deserialize_g1_projective, try_deserialize_g2_projective};
 use crate::Attribute;
 
 #[derive(Debug)]
@@ -225,12 +224,53 @@ pub fn prove_credential_and_set_membership(
     })
 }
 
-// // TODO
-// pub fn verify_set_membership_credential(
-//     params: &Parameters,
-//     verification_key: &VerificationKey,
-//     theta: &SetMembershipTheta,
-//     public_attributes: &[Attribute],
-// ) -> bool {
-//     false
-// }
+pub fn verify_set_membership_credential(
+    params: &Parameters,
+    verification_key: &VerificationKey,
+    sp_verification_key: &VerificationKey,
+    theta: &SetMembershipTheta,
+    public_attributes: &[Attribute],
+) -> bool {
+    if public_attributes.len() + theta.pi.private_attributes() > verification_key.beta.len() {
+        return false;
+    }
+
+    if !theta.verify_proof(
+        params,
+        verification_key,
+        sp_verification_key,
+        &theta.kappa_1,
+        &theta.kappa_2,
+    ) {
+        return false;
+    }
+
+    if bool::from(theta.a_prime.0.is_identity()) || bool::from(theta.sigma_prime.0.is_identity()) {
+        return false;
+    }
+
+    let signed_public_attributes = public_attributes
+        .iter()
+        .zip(
+            verification_key
+                .beta
+                .iter()
+                .skip(theta.pi.private_attributes()),
+        )
+        .map(|(pub_attr, beta_i)| beta_i * pub_attr)
+        .sum::<G2Projective>();
+
+    let kappa_2_all = theta.kappa_2 + signed_public_attributes;
+
+    check_bilinear_pairing(
+        &theta.a_prime.0.to_affine(),
+        &G2Prepared::from(theta.kappa_1.to_affine()),
+        &(theta.a_prime.1).to_affine(),
+        params.prepared_miller_g2(),
+    ) && check_bilinear_pairing(
+        &theta.sigma_prime.0.to_affine(),
+        &G2Prepared::from(theta.kappa_2.to_affine()),
+        &(theta.sigma_prime.1).to_affine(),
+        params.prepared_miller_g2(),
+    )
+}

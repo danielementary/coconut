@@ -45,6 +45,7 @@ pub use scheme::verification::verify_credential;
 pub use scheme::verification::Theta;
 pub use scheme::verification_set_membership::issue_membership_signatures;
 pub use scheme::verification_set_membership::prove_credential_and_set_membership;
+pub use scheme::verification_set_membership::verify_set_membership_credential;
 pub use scheme::BlindedSignature;
 pub use scheme::Signature;
 pub use scheme::SignatureShare;

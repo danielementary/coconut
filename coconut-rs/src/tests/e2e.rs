@@ -2,7 +2,7 @@ use crate::{
     aggregate_signature_shares, aggregate_verification_keys, blind_sign, elgamal_keygen,
     issue_membership_signatures, prepare_blind_sign, prove_credential,
     prove_credential_and_set_membership, setup, ttp_keygen, utils::RawAttribute, verify_credential,
-    CoconutError, Signature, SignatureShare, VerificationKey,
+    verify_set_membership_credential, CoconutError, Signature, SignatureShare, VerificationKey,
 };
 
 #[test]
@@ -187,6 +187,7 @@ fn main_set_membership() -> Result<(), CoconutError> {
         .signatures
         .get(&RawAttribute::Number(private_attribute))
         .unwrap();
+    let sp_verification_key = membership_signatures.sp_verification_key;
 
     // Randomize credentials and generate any cryptographic material to verify them
     let theta = prove_credential_and_set_membership(
@@ -198,13 +199,14 @@ fn main_set_membership() -> Result<(), CoconutError> {
         &private_attributes,
     )?;
 
-    // // Verify credentials
-    // assert!(verify_credential(
-    //     &params,
-    //     &verification_key,
-    //     &theta,
-    //     &public_attributes,
-    // ));
+    // Verify credentials
+    assert!(verify_set_membership_credential(
+        &params,
+        &verification_key,
+        &sp_verification_key,
+        &theta,
+        &public_attributes,
+    ));
 
     Ok(())
 }
