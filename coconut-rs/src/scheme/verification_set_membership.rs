@@ -169,6 +169,10 @@ pub fn issue_membership_signatures(
         })
         .collect();
 
+    if signatures.len() < 2 {
+        panic!("phi must contain at least 2 distinct attributes to issue signatures");
+    }
+
     let sp_verification_key = sp_key_pair.verification_key();
 
     MembershipSignatures {
@@ -279,15 +283,13 @@ pub fn verify_set_membership_credential(
 #[cfg(test)]
 mod tests {
     use crate::scheme::setup::setup;
+    use crate::scheme::verification::check_bilinear_pairing;
 
     use super::*;
 
     #[test]
     fn issue_membership_signatures_len() {
         let params = setup(1).unwrap();
-
-        let phi_1 = [RawAttribute::Number(0)];
-        let membership_signatures_1 = issue_membership_signatures(&params, &phi_1);
 
         let phi_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
         let membership_signatures_2 = issue_membership_signatures(&params, &phi_2);
@@ -299,8 +301,61 @@ mod tests {
         ];
         let membership_signatures_3 = issue_membership_signatures(&params, &phi_3);
 
-        assert_eq!(phi_1.len(), membership_signatures_1.signatures.len());
         assert_eq!(phi_2.len(), membership_signatures_2.signatures.len());
         assert_eq!(phi_3.len(), membership_signatures_3.signatures.len());
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "phi must contain at least 2 distinct attributes to issue signatures"
+    )]
+    fn issue_membership_signatures_empty_phi() {
+        let params = setup(1).unwrap();
+
+        let phi_0 = [];
+        issue_membership_signatures(&params, &phi_0);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "phi must contain at least 2 distinct attributes to issue signatures"
+    )]
+    fn issue_membership_signatures_small_phi() {
+        let params = setup(1).unwrap();
+
+        let phi_1 = [RawAttribute::Number(0)];
+        issue_membership_signatures(&params, &phi_1);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "phi must contain at least 2 distinct attributes to issue signatures"
+    )]
+    fn issue_membership_signatures_small_phi_dup() {
+        let params = setup(1).unwrap();
+
+        let phi_2_dup = [RawAttribute::Number(0), RawAttribute::Number(0)];
+        issue_membership_signatures(&params, &phi_2_dup);
+    }
+
+    #[test]
+    fn issue_membership_signatures_valid() {
+        let params = setup(1).unwrap();
+
+        let phi_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
+        let membership_signatures_2 = issue_membership_signatures(&params, &phi_2);
+        let sp_verification_key = membership_signatures_2.sp_verification_key;
+
+        for (m, Signature(s1, s2)) in membership_signatures_2.signatures.iter() {
+            let abm = sp_verification_key.alpha
+                + sp_verification_key.beta[0] * (Attribute::from(m.clone()));
+
+            assert!(check_bilinear_pairing(
+                &s1.to_affine(),
+                &G2Prepared::from(abm.to_affine()),
+                &s2.to_affine(),
+                params.prepared_miller_g2(),
+            ));
+        }
     }
 }
