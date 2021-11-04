@@ -24,10 +24,8 @@ pub use keygen::{SecretKey, VerificationKey};
 
 use crate::elgamal::Ciphertext;
 use crate::error::{CoconutError, Result};
-use crate::scheme::aggregation::{aggregate_signature_shares, aggregate_signatures};
 use crate::scheme::setup::Parameters;
 use crate::scheme::verification::check_bilinear_pairing;
-use crate::scheme::verification_set_membership::issue_membership_signatures;
 use crate::traits::{Base58, Bytable};
 use crate::utils::try_deserialize_g1_projective;
 use crate::{elgamal, Attribute};

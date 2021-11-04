@@ -18,7 +18,7 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 
 use bls12_381::{G2Prepared, G2Projective};
-use group::{Curve, Group};
+use group::Curve;
 
 use crate::error::{CoconutError, Result};
 use crate::proofs::SetMembershipProof;
@@ -269,7 +269,7 @@ pub fn verify_set_membership_credential(
         params.prepared_miller_g2(),
     ) && check_bilinear_pairing(
         &theta.sigma_prime.0.to_affine(),
-        &G2Prepared::from(theta.kappa_2.to_affine()),
+        &G2Prepared::from(kappa_2_all.to_affine()),
         &(theta.sigma_prime.1).to_affine(),
         params.prepared_miller_g2(),
     )

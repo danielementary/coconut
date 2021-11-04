@@ -790,6 +790,7 @@ impl SetMembershipProof {
 
 #[cfg(test)]
 mod tests {
+    use crate::Signature;
     use group::Group;
     use rand::thread_rng;
 
