@@ -39,7 +39,7 @@ use crate::{elgamal, Attribute, ElGamalKeyPair};
 // as per the reference python implementation
 pub type ChallengeDigest = Sha256;
 
-const G2PROJ_SIZE: usize = size_of::<G2Projective>();
+const G2PCOMPRESSED_SIZE: usize = 96;
 const USIZE_SIZE: usize = size_of::<usize>();
 const SCALAR_SIZE: usize = size_of::<Scalar>();
 
@@ -685,7 +685,7 @@ impl SetMembershipProof {
 
     // kappa_1_prime || kappa_2_prime || s_mi.len() || s_mi || s_r1 || s_r2 || challenge
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        let total_size = 2 * G2PROJ_SIZE
+        let total_size = 2 * G2PCOMPRESSED_SIZE
             + USIZE_SIZE
             + self.s_mi.len() * SCALAR_SIZE
             + 2 * SCALAR_SIZE
@@ -710,7 +710,8 @@ impl SetMembershipProof {
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let min_size = 2 * G2PROJ_SIZE + USIZE_SIZE + SCALAR_SIZE + 2 * SCALAR_SIZE + SCALAR_SIZE;
+        let min_size =
+            2 * G2PCOMPRESSED_SIZE + USIZE_SIZE + SCALAR_SIZE + 2 * SCALAR_SIZE + SCALAR_SIZE;
 
         if bytes.len() < min_size || (bytes.len() - min_size) % SCALAR_SIZE != 0 {
             return Err(CoconutError::DeserializationInvalidLength {
@@ -722,16 +723,16 @@ impl SetMembershipProof {
             });
         }
 
-        let kappa_1_prime_bytes = bytes[..G2PROJ_SIZE].try_into().unwrap();
-        let mut p = G2PROJ_SIZE;
+        let kappa_1_prime_bytes = bytes[..G2PCOMPRESSED_SIZE].try_into().unwrap();
+        let mut p = G2PCOMPRESSED_SIZE;
 
         let kappa_1_prime = try_deserialize_g2_projective(
             &kappa_1_prime_bytes,
             CoconutError::Deserialization("failed to deserialize kappa_1'".to_string()),
         )?;
 
-        let kappa_2_prime_bytes = bytes[p..p + G2PROJ_SIZE].try_into().unwrap();
-        p += G2PROJ_SIZE;
+        let kappa_2_prime_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+        p += G2PCOMPRESSED_SIZE;
 
         let kappa_2_prime = try_deserialize_g2_projective(
             &kappa_2_prime_bytes,
@@ -795,7 +796,7 @@ mod tests {
     use rand::thread_rng;
 
     use crate::scheme::issuance::{compute_attribute_encryption, compute_commitment_hash};
-    use crate::scheme::keygen::keygen;
+    use crate::scheme::keygen::{keygen, single_attribute_keygen};
     use crate::scheme::setup::setup;
     use crate::scheme::verification::compute_kappa;
     use crate::scheme::verification_set_membership::issue_membership_signatures;
@@ -1028,5 +1029,77 @@ mod tests {
             &kappa_1,
             &kappa_2
         ));
+    }
+
+    #[test]
+    fn set_membership_proof_bytes_roundtrip_1() {
+        let params = setup(1).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(1);
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
+    }
+
+    #[test]
+    fn set_membership_proof_bytes_roundtrip_10() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(10);
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
+    }
+
+    #[test]
+    fn set_membership_proof_bytes_roundtrip_5_5() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(5);
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
     }
 }
