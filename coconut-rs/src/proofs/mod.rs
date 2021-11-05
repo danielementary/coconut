@@ -795,7 +795,7 @@ mod tests {
     use rand::thread_rng;
 
     use crate::scheme::issuance::{compute_attribute_encryption, compute_commitment_hash};
-    use crate::scheme::keygen::{keygen, single_attribute_keygen};
+    use crate::scheme::keygen::keygen;
     use crate::scheme::setup::setup;
     use crate::scheme::verification::compute_kappa;
     use crate::scheme::verification_set_membership::issue_membership_signatures;
@@ -903,14 +903,15 @@ mod tests {
         assert_eq!(ProofKappaNu::from_bytes(&bytes).unwrap(), pi_v);
     }
 
-    // TODO double check this test
     #[test]
-    fn set_membership_proof_correctness() {
+    fn set_membership_proof_correctness_1() {
         let params = setup(1).unwrap();
 
+        // define one single private attribute
         let private_attribute = 0;
         let private_attributes = [Scalar::from(private_attribute)];
 
+        // issue signatures for the values of the set
         let phi = [
             RawAttribute::Number(0),
             RawAttribute::Number(1),
@@ -918,6 +919,7 @@ mod tests {
         ];
         let membership_signatures = issue_membership_signatures(&params, &phi);
 
+        // pick the right signature for attribute
         let membership_signature = membership_signatures
             .signatures
             .get(&RawAttribute::Number(private_attribute))
@@ -925,16 +927,17 @@ mod tests {
         let sp_verification_key = membership_signatures.sp_verification_key;
 
         let h = hash_g1("h");
-        let key_pair = single_attribute_keygen(&params);
+        let key_pair = keygen(&params);
 
+        // simulate a valid signature on attribute
         let signature = Signature(
             h,
             h * key_pair.secret_key().x
                 + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
         );
 
-        let (a_prime, r1) = membership_signature.randomise(&params);
-        let (sigma_prime, r2) = signature.randomise(&params);
+        let (_a_prime, r1) = membership_signature.randomise(&params);
+        let (_sigma_prime, r2) = signature.randomise(&params);
 
         let pi = SetMembershipProof::construct(
             &params,
@@ -953,6 +956,71 @@ mod tests {
             r2,
         );
 
+        // this only checks that signatures are "randomized" as they should
+        assert!(pi.verify(
+            &params,
+            &key_pair.verification_key(),
+            &sp_verification_key,
+            &kappa_1,
+            &kappa_2
+        ));
+    }
+
+    #[test]
+    fn set_membership_proof_correctness_2() {
+        let params = setup(2).unwrap();
+
+        // define two private attributes but only first is used for set membership
+        let private_attribute = 0;
+        let private_attributes = [Scalar::from(private_attribute), params.random_scalar()];
+
+        // issue signatures for the values of the set
+        let phi = [
+            RawAttribute::Number(0),
+            RawAttribute::Number(1),
+            RawAttribute::Number(2),
+        ];
+        let membership_signatures = issue_membership_signatures(&params, &phi);
+
+        // pick the right signature for attribute
+        let membership_signature = membership_signatures
+            .signatures
+            .get(&RawAttribute::Number(private_attribute))
+            .unwrap();
+        let sp_verification_key = membership_signatures.sp_verification_key;
+
+        let h = hash_g1("h");
+        let key_pair = keygen(&params);
+
+        // simulate a valid signature on attribute
+        let signature = Signature(
+            h,
+            h * key_pair.secret_key().x
+                + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attributes[0]))
+                    + key_pair.secret_key().ys[1] * (Attribute::from(private_attributes[1]))),
+        );
+
+        let (_a_prime, r1) = membership_signature.randomise(&params);
+        let (_sigma_prime, r2) = signature.randomise(&params);
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &key_pair.verification_key(),
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let kappa_1 = compute_kappa(&params, &sp_verification_key, &private_attributes, r1);
+        let kappa_2 = compute_kappa(
+            &params,
+            &key_pair.verification_key(),
+            &private_attributes,
+            r2,
+        );
+
+        // this only checks that signatures are "randomized" as they should
         assert!(pi.verify(
             &params,
             &key_pair.verification_key(),
