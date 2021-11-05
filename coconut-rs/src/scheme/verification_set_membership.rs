@@ -282,6 +282,7 @@ pub fn verify_set_membership_credential(
 
 #[cfg(test)]
 mod tests {
+    use crate::scheme::keygen::keygen;
     use crate::scheme::setup::setup;
     use crate::scheme::verification::check_bilinear_pairing;
 
@@ -357,5 +358,107 @@ mod tests {
                 params.prepared_miller_g2(),
             ));
         }
+    }
+
+    #[test]
+    fn set_membership_theta_bytes_roundtrip_1() {
+        let params = setup(1).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(1);
+
+        let signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let membership_signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let theta = prove_credential_and_set_membership(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &signature,
+            &membership_signature,
+            &private_attributes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            SetMembershipTheta::try_from(theta.to_bytes().as_slice()).unwrap(),
+            theta
+        );
+    }
+
+    #[test]
+    fn set_membership_theta_bytes_roundtrip_10() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(10);
+
+        let signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let membership_signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let theta = prove_credential_and_set_membership(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &signature,
+            &membership_signature,
+            &private_attributes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            SetMembershipTheta::try_from(theta.to_bytes().as_slice()).unwrap(),
+            theta
+        );
+    }
+
+    #[test]
+    fn set_membership_theta_bytes_roundtrip_5_5() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(5);
+
+        let signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let membership_signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let theta = prove_credential_and_set_membership(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &signature,
+            &membership_signature,
+            &private_attributes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            SetMembershipTheta::try_from(theta.to_bytes().as_slice()).unwrap(),
+            theta
+        );
     }
 }
