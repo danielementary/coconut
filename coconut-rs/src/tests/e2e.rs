@@ -110,12 +110,12 @@ fn main_set_membership() -> Result<(), CoconutError> {
     let elgamal_keypair = elgamal_keygen(&params);
 
     // issue signatures for 0, 1 and 2
-    let phi = [
+    let set = [
         RawAttribute::Number(0),
         RawAttribute::Number(1),
         RawAttribute::Number(2),
     ];
-    let membership_signatures = issue_membership_signatures(&params, &phi);
+    let membership_signatures = issue_membership_signatures(&params, &set);
 
     // generate commitment and encryption
     let blind_sign_request = prepare_blind_sign(
