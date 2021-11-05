@@ -29,7 +29,7 @@ use crate::scheme::Signature;
 use crate::scheme::VerificationKey;
 use crate::traits::{Base58, Bytable};
 use crate::utils::try_deserialize_g2_projective;
-use crate::utils::{hash_g1, RawAttribute};
+use crate::utils::RawAttribute;
 use crate::Attribute;
 
 #[derive(Debug)]
@@ -148,19 +148,17 @@ pub struct MembershipSignatures {
 
 pub fn issue_membership_signatures(
     params: &Parameters,
-    phi: &[RawAttribute],
+    set: &[RawAttribute],
 ) -> MembershipSignatures {
-    let sp_key_pair = single_attribute_keygen(params);
-    // is the h random ? the same for all signatures ?
-    let h = hash_g1("SPh");
+    let sp_key_pair = single_attribute_keygen(params); // ideally move it as an argument
+    let h = params.gen1() * params.random_scalar();
 
-    // always only one attribute ?
     let sp_sk = sp_key_pair.secret_key();
     let h_sp_sky = h * sp_sk.ys[0];
 
-    let signatures: HashMap<RawAttribute, Signature> = phi
+    let signatures: HashMap<RawAttribute, Signature> = set
         .iter()
-        .zip(vec![h * sp_sk.x; phi.len()].iter())
+        .zip(vec![h * sp_sk.x; set.len()].iter())
         .map(|(attr, h_sp_skx)| {
             (
                 attr.clone(), // is it possible to avoid clones ?
@@ -170,7 +168,7 @@ pub fn issue_membership_signatures(
         .collect();
 
     if signatures.len() < 2 {
-        panic!("phi must contain at least 2 distinct attributes to issue signatures");
+        panic!("set must contain at least 2 distinct attributes to issue signatures");
     }
 
     let sp_verification_key = sp_key_pair.verification_key();
@@ -292,59 +290,59 @@ mod tests {
     fn issue_membership_signatures_len() {
         let params = setup(1).unwrap();
 
-        let phi_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
-        let membership_signatures_2 = issue_membership_signatures(&params, &phi_2);
+        let set_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
+        let membership_signatures_2 = issue_membership_signatures(&params, &set_2);
 
-        let phi_3 = [
+        let set_3 = [
             RawAttribute::Number(0),
             RawAttribute::Number(1),
             RawAttribute::Number(2),
         ];
-        let membership_signatures_3 = issue_membership_signatures(&params, &phi_3);
+        let membership_signatures_3 = issue_membership_signatures(&params, &set_3);
 
-        assert_eq!(phi_2.len(), membership_signatures_2.signatures.len());
-        assert_eq!(phi_3.len(), membership_signatures_3.signatures.len());
+        assert_eq!(set_2.len(), membership_signatures_2.signatures.len());
+        assert_eq!(set_3.len(), membership_signatures_3.signatures.len());
     }
 
     #[test]
     #[should_panic(
-        expected = "phi must contain at least 2 distinct attributes to issue signatures"
+        expected = "set must contain at least 2 distinct attributes to issue signatures"
     )]
-    fn issue_membership_signatures_empty_phi() {
+    fn issue_membership_signatures_empty_set() {
         let params = setup(1).unwrap();
 
-        let phi_0 = [];
-        issue_membership_signatures(&params, &phi_0);
+        let set_0 = [];
+        issue_membership_signatures(&params, &set_0);
     }
 
     #[test]
     #[should_panic(
-        expected = "phi must contain at least 2 distinct attributes to issue signatures"
+        expected = "set must contain at least 2 distinct attributes to issue signatures"
     )]
-    fn issue_membership_signatures_small_phi() {
+    fn issue_membership_signatures_small_set() {
         let params = setup(1).unwrap();
 
-        let phi_1 = [RawAttribute::Number(0)];
-        issue_membership_signatures(&params, &phi_1);
+        let set_1 = [RawAttribute::Number(0)];
+        issue_membership_signatures(&params, &set_1);
     }
 
     #[test]
     #[should_panic(
-        expected = "phi must contain at least 2 distinct attributes to issue signatures"
+        expected = "set must contain at least 2 distinct attributes to issue signatures"
     )]
-    fn issue_membership_signatures_small_phi_dup() {
+    fn issue_membership_signatures_small_set_dup() {
         let params = setup(1).unwrap();
 
-        let phi_2_dup = [RawAttribute::Number(0), RawAttribute::Number(0)];
-        issue_membership_signatures(&params, &phi_2_dup);
+        let set_2_dup = [RawAttribute::Number(0), RawAttribute::Number(0)];
+        issue_membership_signatures(&params, &set_2_dup);
     }
 
     #[test]
     fn issue_membership_signatures_valid() {
         let params = setup(1).unwrap();
 
-        let phi_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
-        let membership_signatures_2 = issue_membership_signatures(&params, &phi_2);
+        let set_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
+        let membership_signatures_2 = issue_membership_signatures(&params, &set_2);
         let sp_verification_key = membership_signatures_2.sp_verification_key;
 
         for (m, Signature(s1, s2)) in membership_signatures_2.signatures.iter() {
