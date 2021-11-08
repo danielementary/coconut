@@ -35,6 +35,7 @@ pub mod issuance;
 pub mod keygen;
 pub mod setup;
 pub mod verification;
+pub mod verification_range_proof;
 pub mod verification_set_membership;
 
 pub type SignerIndex = u64;

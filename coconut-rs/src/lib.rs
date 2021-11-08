@@ -43,6 +43,7 @@ pub use scheme::setup::Parameters;
 pub use scheme::verification::prove_credential;
 pub use scheme::verification::verify_credential;
 pub use scheme::verification::Theta;
+pub use scheme::verification_range_proof::compute_u_ary_decomposition;
 pub use scheme::verification_set_membership::issue_membership_signatures;
 pub use scheme::verification_set_membership::prove_credential_and_set_membership;
 pub use scheme::verification_set_membership::verify_set_membership_credential;
