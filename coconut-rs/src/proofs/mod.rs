@@ -784,6 +784,19 @@ impl SetMembershipProof {
     }
 }
 
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct RangeProof {
+    challenge: Scalar, // to remove later after testing
+    kappas_a_prime: Vec<G2Projective>,
+    kappas_b_prime: Vec<G2Projective>,
+    kappa_prime: G2Projective,
+    s_mi: Vec<Scalar>,
+    s_r_a: Vec<Scalar>,
+    s_r_b: Vec<Scalar>,
+    s_r: Scalar,
+}
+
 // proof builder:
 // - commitment
 // - challenge
