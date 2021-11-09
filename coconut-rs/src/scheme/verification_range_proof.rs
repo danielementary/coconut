@@ -26,6 +26,7 @@ use crate::proofs::RangeProof;
 use crate::scheme::keygen::single_attribute_keygen;
 use crate::scheme::setup::Parameters;
 use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
+use crate::scheme::verification_set_membership::{issue_membership_signatures, SpSignatures};
 use crate::scheme::Signature;
 use crate::scheme::VerificationKey;
 use crate::traits::{Base58, Bytable};
@@ -282,6 +283,16 @@ impl Bytable for RangeTheta {
 }
 
 impl Base58 for RangeTheta {}
+
+pub fn issue_range_signatures(params: &Parameters) -> SpSignatures {
+    let set: Vec<usize> = (0..U).collect();
+    let set: Vec<RawAttribute> = set
+        .iter()
+        .map(|e| RawAttribute::Number(*e as u64))
+        .collect();
+
+    issue_membership_signatures(params, &set[..])
+}
 
 fn scalar_smaller_than_2_16(number: Scalar) -> bool {
     let number_bytes = number.to_bytes();

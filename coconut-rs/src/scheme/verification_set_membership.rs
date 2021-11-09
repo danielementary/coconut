@@ -139,15 +139,12 @@ impl Bytable for SetMembershipTheta {
 impl Base58 for SetMembershipTheta {}
 
 // struct that embeds all set membership signatures and corresponding public key
-pub struct MembershipSignatures {
+pub struct SpSignatures {
     pub signatures: HashMap<RawAttribute, Signature>,
     pub sp_verification_key: VerificationKey,
 }
 
-pub fn issue_membership_signatures(
-    params: &Parameters,
-    set: &[RawAttribute],
-) -> MembershipSignatures {
+pub fn issue_membership_signatures(params: &Parameters, set: &[RawAttribute]) -> SpSignatures {
     let sp_key_pair = single_attribute_keygen(params); // ideally move it as an argument
     let h = params.gen1() * params.random_scalar();
 
@@ -171,7 +168,7 @@ pub fn issue_membership_signatures(
 
     let sp_verification_key = sp_key_pair.verification_key();
 
-    MembershipSignatures {
+    SpSignatures {
         signatures,
         sp_verification_key,
     }
