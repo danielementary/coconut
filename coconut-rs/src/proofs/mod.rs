@@ -1058,6 +1058,47 @@ impl RangeProof {
             && kappa_a_lhs == kappa_a_rhs
             && kappa_b_lhs == kappa_b_rhs
     }
+
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        let total_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
+            + 4 * L * SCALAR_SIZE
+            + self.s_m.len() * SCALAR_SIZE
+            + SCALAR_SIZE
+            + SCALAR_SIZE;
+
+        let mut bytes = Vec::with_capacity(total_size);
+
+        for k in &self.kappas_a_prime {
+            bytes.extend_from_slice(&k.to_affine().to_compressed());
+        }
+
+        for k in &self.kappas_b_prime {
+            bytes.extend_from_slice(&k.to_affine().to_compressed());
+        }
+
+        bytes.extend_from_slice(&self.kappa_a_prime.to_affine().to_compressed());
+        bytes.extend_from_slice(&self.kappa_b_prime.to_affine().to_compressed());
+
+        for s in &self.s_m_a {
+            bytes.extend_from_slice(&s.to_bytes());
+        }
+
+        for s in &self.s_m_b {
+            bytes.extend_from_slice(&s.to_bytes());
+        }
+
+        for s in &self.s_r_a {
+            bytes.extend_from_slice(&s.to_bytes());
+        }
+
+        for s in &self.s_r_b {
+            bytes.extend_from_slice(&s.to_bytes());
+        }
+
+        bytes.extend_from_slice(&self.s_r.to_bytes());
+
+        bytes
+    }
 }
 
 // proof builder:
