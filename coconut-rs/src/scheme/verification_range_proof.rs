@@ -189,6 +189,82 @@ impl RangeTheta {
             &self.kappa_b,
         )
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let a_bytes = self.a.to_bytes();
+        let b_bytes = self.b.to_bytes();
+        let kappas_a_bytes = self
+            .kappas_a
+            .iter()
+            .map(|k| k.to_affine().to_compressed())
+            .collect::<Vec<_>>();
+        let kappas_b_bytes = self
+            .kappas_b
+            .iter()
+            .map(|k| k.to_affine().to_compressed())
+            .collect::<Vec<_>>();
+        let a_prime_a_bytes = self
+            .a_prime_a
+            .iter()
+            .map(|a| a.to_bytes())
+            .collect::<Vec<_>>();
+        let a_prime_b_bytes = self
+            .a_prime_b
+            .iter()
+            .map(|a| a.to_bytes())
+            .collect::<Vec<_>>();
+        let kappa_a_bytes = self.kappa_a.to_affine().to_compressed();
+        let kappa_b_bytes = self.kappa_b.to_affine().to_compressed();
+        let sigma_prime_a_bytes = self.sigma_prime_a.to_bytes();
+        let sigma_prime_b_bytes = self.sigma_prime_b.to_bytes();
+        let pi_bytes = self.pi.to_bytes();
+
+        let kappas_a_bytes_len: usize = kappas_a_bytes.iter().map(|e| e.len()).sum();
+        let kappas_b_bytes_len: usize = kappas_b_bytes.iter().map(|e| e.len()).sum();
+        let a_prime_a_bytes_len: usize = a_prime_a_bytes.iter().map(|e| e.len()).sum();
+        let a_prime_b_bytes_len: usize = a_prime_b_bytes.iter().map(|e| e.len()).sum();
+
+        let mut bytes = Vec::with_capacity(
+            a_bytes.len()
+                + b_bytes.len()
+                + kappas_a_bytes_len
+                + kappas_b_bytes_len
+                + a_prime_a_bytes_len
+                + a_prime_b_bytes_len
+                + kappa_a_bytes.len()
+                + kappa_b_bytes.len()
+                + sigma_prime_a_bytes.len()
+                + sigma_prime_b_bytes.len()
+                + pi_bytes.len(),
+        );
+
+        bytes.extend_from_slice(&a_bytes);
+        bytes.extend_from_slice(&b_bytes);
+
+        for b in kappas_a_bytes.iter() {
+            bytes.extend_from_slice(b);
+        }
+
+        for b in kappas_b_bytes.iter() {
+            bytes.extend_from_slice(b);
+        }
+
+        for b in a_prime_a_bytes.iter() {
+            bytes.extend_from_slice(b);
+        }
+
+        for b in a_prime_b_bytes.iter() {
+            bytes.extend_from_slice(b);
+        }
+
+        bytes.extend_from_slice(&kappa_a_bytes);
+        bytes.extend_from_slice(&kappa_b_bytes);
+        bytes.extend_from_slice(&sigma_prime_a_bytes);
+        bytes.extend_from_slice(&sigma_prime_b_bytes);
+        bytes.extend_from_slice(&pi_bytes);
+
+        bytes
+    }
 }
 
 fn scalar_smaller_than_2_16(number: Scalar) -> bool {
