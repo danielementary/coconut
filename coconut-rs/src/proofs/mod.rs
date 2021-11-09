@@ -937,6 +937,127 @@ impl RangeProof {
     pub(crate) fn private_attributes(&self) -> usize {
         self.s_m.len()
     }
+
+    pub(crate) fn verify(
+        &self,
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+        a: Scalar, // lower bound
+        b: Scalar, // upper bound
+        kappas_a: &Vec<G2Projective>,
+        kappas_b: &Vec<G2Projective>,
+        kappa_a: &G2Projective,
+        kappa_b: &G2Projective,
+    ) -> bool {
+        let kappas_a_prime_bytes = self
+            .kappas_a_prime
+            .iter()
+            .map(|k| k.to_bytes())
+            .collect::<Vec<_>>();
+
+        let kappas_b_prime_bytes = self
+            .kappas_b_prime
+            .iter()
+            .map(|k| k.to_bytes())
+            .collect::<Vec<_>>();
+
+        let beta_bytes = verification_key.beta[1..]
+            .iter()
+            .map(|b| b.to_bytes())
+            .collect::<Vec<_>>();
+
+        // recompute challenge
+        let challenge = compute_challenge::<ChallengeDigest, _, _>(
+            kappas_a_prime_bytes
+                .iter()
+                .map(|b| b.as_ref())
+                .chain(kappas_b_prime_bytes.iter().map(|b| b.as_ref()))
+                .chain(std::iter::once(self.kappa_a_prime.to_bytes().as_ref()))
+                .chain(std::iter::once(self.kappa_b_prime.to_bytes().as_ref()))
+                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
+                .chain(std::iter::once(
+                    sp_verification_key.alpha.to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(
+                    sp_verification_key.beta[0].to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
+                .chain(beta_bytes.iter().map(|b| b.as_ref())),
+        );
+
+        // to remove after test
+        assert_eq!(challenge, self.challenge);
+
+        let kappas_a_lhs = self
+            .kappas_a_prime
+            .iter()
+            .map(|k| sp_verification_key.alpha * (-Scalar::one()) + k)
+            .collect::<Vec<_>>();
+
+        let kappas_b_lhs = self
+            .kappas_b_prime
+            .iter()
+            .map(|k| sp_verification_key.alpha * (-Scalar::one()) + k)
+            .collect::<Vec<_>>();
+
+        let kappas_a_rhs = izip!(kappas_a, &self.s_r_a, &self.s_m_a)
+            .map(|(k, r, m)| {
+                (sp_verification_key.alpha * (-Scalar::one()) + k) * challenge
+                    + params.gen2() * r
+                    + sp_verification_key.beta[0] * m
+            })
+            .collect::<Vec<_>>();
+
+        let kappas_b_rhs = izip!(kappas_b, &self.s_r_b, &self.s_m_b)
+            .map(|(k, r, m)| {
+                (sp_verification_key.alpha * (-Scalar::one()) + k) * challenge
+                    + params.gen2() * r
+                    + sp_verification_key.beta[0] * m
+            })
+            .collect::<Vec<_>>();
+
+        let beta1 = verification_key.beta[0];
+        let partial_kappa: G2Projective = self.s_m[1..]
+            .iter()
+            .zip(verification_key.beta[1..].iter())
+            .map(|(s_mi, beta_i)| beta_i * s_mi)
+            .sum();
+
+        let kappa_a_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_a_prime;
+        let kappa_a_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_a) * challenge
+            + params.gen2() * self.s_r
+            + beta1 * a
+            + beta1
+            + beta1 * (-challenge)
+            + self
+                .s_m_a
+                .iter()
+                .enumerate()
+                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((U as u64).pow(i as u32))))
+                .sum::<G2Projective>()
+            + partial_kappa;
+
+        let beta1_b_ul = beta1 * b + beta1 * (-Scalar::from((U as u64).pow(L as u32)));
+
+        let kappa_b_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_b_prime;
+        let kappa_b_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_b) * challenge
+            + params.gen2() * self.s_r
+            + beta1_b_ul
+            + beta1_b_ul * (-challenge)
+            + self
+                .s_m_b
+                .iter()
+                .enumerate()
+                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((U as u64).pow(i as u32))))
+                .sum::<G2Projective>()
+            + partial_kappa;
+
+        kappas_a_lhs == kappas_a_rhs
+            && kappas_b_lhs == kappas_b_rhs
+            && kappa_a_lhs == kappa_a_rhs
+            && kappa_b_lhs == kappa_b_rhs
+    }
 }
 
 // proof builder:
