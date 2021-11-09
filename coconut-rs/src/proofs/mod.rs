@@ -909,6 +909,7 @@ impl RangeProof {
                 .chain(beta_bytes.iter().map(|b| b.as_ref())),
         );
 
+        // compute responses
         let s_m_a = produce_responses(&r_m_a, &challenge, &m_a);
         let s_m_b = produce_responses(&r_m_b, &challenge, &m_b);
 
@@ -931,6 +932,10 @@ impl RangeProof {
             s_m,
             s_r,
         }
+    }
+
+    pub(crate) fn private_attributes(&self) -> usize {
+        self.s_m.len()
     }
 }
 
