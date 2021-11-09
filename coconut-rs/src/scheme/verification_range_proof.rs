@@ -12,25 +12,142 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// use std::collections::HashMap;
+use std::collections::HashMap;
 
-// use std::convert::TryFrom;
-// use std::convert::TryInto;
+use std::convert::TryFrom;
+use std::convert::TryInto;
 
-use bls12_381::{G2Prepared, G2Projective, Scalar};
-// use group::Curve;
+use bls12_381::{G1Projective, G2Prepared, G2Projective, Scalar};
+use group::Curve;
+use std::mem::size_of;
 
-// use crate::error::{CoconutError, Result};
-// use crate::proofs::SetMembershipProof;
-// use crate::scheme::keygen::single_attribute_keygen;
-// use crate::scheme::setup::Parameters;
-// use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
-// use crate::scheme::Signature;
-// use crate::scheme::VerificationKey;
-// use crate::traits::{Base58, Bytable};
-// use crate::utils::try_deserialize_g2_projective;
-// use crate::utils::RawAttribute;
-// use crate::Attribute;
+use crate::error::{CoconutError, Result};
+use crate::proofs::RangeProof;
+use crate::scheme::keygen::single_attribute_keygen;
+use crate::scheme::setup::Parameters;
+use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
+use crate::scheme::Signature;
+use crate::scheme::VerificationKey;
+use crate::traits::{Base58, Bytable};
+use crate::utils::RawAttribute;
+use crate::utils::{try_deserialize_g2_projective, try_deserialize_scalar};
+use crate::Attribute;
+
+const G2PCOMPRESSED_SIZE: usize = 96;
+const USIZE_SIZE: usize = size_of::<usize>();
+const SCALAR_SIZE: usize = size_of::<Scalar>();
+const SIGNATURE_SIZE: usize = 96;
+
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct RangeTheta {
+    pub a: Scalar, // lower bound
+    pub b: Scalar, // upper bound
+    pub kappas_a: Vec<G2Projective>,
+    pub kappas_b: Vec<G2Projective>,
+    pub a_prime_a: Vec<Signature>,
+    pub a_prime_b: Vec<Signature>,
+    pub kappa: G2Projective,
+    pub sigma_prime: Signature,
+    pub pi: RangeProof,
+}
+
+impl TryFrom<&[u8]> for RangeTheta {
+    type Error = CoconutError;
+
+    fn try_from(bytes: &[u8]) -> Result<RangeTheta> {
+        let min_size = 2 * SCALAR_SIZE
+            + 2 * L * G2PCOMPRESSED_SIZE
+            + 2 * L * SIGNATURE_SIZE
+            + G2PCOMPRESSED_SIZE
+            + SIGNATURE_SIZE;
+
+        let mut p = 0;
+
+        let a_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let a = try_deserialize_scalar(
+            &a_bytes,
+            CoconutError::Deserialization("failed to deserialize the a".to_string()),
+        )?;
+
+        let b_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let b = try_deserialize_scalar(
+            &b_bytes,
+            CoconutError::Deserialization("failed to deserialize the b".to_string()),
+        )?;
+
+        let mut kappas_a: [G2Projective; L] = [G2Projective::default(); L];
+        for i in 0..L {
+            let kappas_a_i_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+            kappas_a[i] = try_deserialize_g2_projective(
+                &kappas_a_i_bytes,
+                CoconutError::Deserialization("failed to deserialize kappas_a".to_string()),
+            )?;
+
+            p += G2PCOMPRESSED_SIZE;
+        }
+        let kappas_a = kappas_a.to_vec();
+
+        let mut kappas_b: [G2Projective; L] = [G2Projective::default(); L];
+        for i in 0..L {
+            let kappas_b_i_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+            kappas_b[i] = try_deserialize_g2_projective(
+                &kappas_b_i_bytes,
+                CoconutError::Deserialization("failed to deserialize kappas_a".to_string()),
+            )?;
+
+            p += G2PCOMPRESSED_SIZE;
+        }
+        let kappas_b = kappas_b.to_vec();
+
+        let mut a_prime_a: [Signature; L] =
+            [Signature(G1Projective::default(), G1Projective::default()); L];
+        for i in 0..L {
+            a_prime_a[i] = Signature::try_from(&bytes[p..p + SIGNATURE_SIZE])?;
+
+            p += G2PCOMPRESSED_SIZE;
+        }
+        let a_prime_a = a_prime_a.to_vec();
+
+        let mut a_prime_b: [Signature; L] =
+            [Signature(G1Projective::default(), G1Projective::default()); L];
+        for i in 0..L {
+            a_prime_b[i] = Signature::try_from(&bytes[p..p + SIGNATURE_SIZE])?;
+
+            p += G2PCOMPRESSED_SIZE;
+        }
+        let a_prime_b = a_prime_b.to_vec();
+
+        let kappa_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let kappa = try_deserialize_g2_projective(
+            &kappa_bytes,
+            CoconutError::Deserialization("failed to deserialize kappa".to_string()),
+        )?;
+
+        let sigma_prime = Signature::try_from(&bytes[p..p + SIGNATURE_SIZE])?;
+        p += SIGNATURE_SIZE;
+
+        let pi = RangeProof::from_bytes(&bytes[p..])?;
+
+        Ok(RangeTheta {
+            a,
+            b,
+            kappas_a,
+            kappas_b,
+            a_prime_a,
+            a_prime_b,
+            kappa,
+            sigma_prime,
+            pi,
+        })
+    }
+}
 
 // values for u-ary decomposition
 // computed according to paper for [0; 2^16) range
