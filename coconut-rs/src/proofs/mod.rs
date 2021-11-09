@@ -30,9 +30,11 @@ use sha2::Sha256;
 use crate::elgamal::Ciphertext;
 use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
+use crate::scheme::verification_range_proof::{compute_u_ary_decomposition, L, U};
 use crate::scheme::VerificationKey;
 use crate::utils::{
     hash_g1, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
+    RawAttribute,
 };
 use crate::{elgamal, Attribute, ElGamalKeyPair};
 
@@ -796,6 +798,78 @@ pub struct RangeProof {
     s_r_b: Vec<Scalar>,
     s_r: Scalar,
 }
+
+// impl RangeProof {
+//     pub(crate) fn construct(
+//         params: &Parameters,
+//         verification_key: &VerificationKey,
+//         sp_verification_key: &VerificationKey,
+//         private_attributes: &[Attribute],
+//         r_a: &Vec<Scalar>,
+//         r_b: &Vec<Scalar>,
+//         r: &Scalar,
+//     ) -> Self {
+//         let m = private_attributes[0].0[0] as u64;
+//         let m_a = compute_u_ary_decomposition(private_attributes[0] - a);
+//         let m_b = compute_u_ary_decomposition(private_attributes[0] - b + U.pow(L));
+
+//         // pick random witnesses
+//         let r_r_a = params.n_random_scalars(L);
+//         let r_r_b = params.n_random_scalars(L);
+//         let r_mi = params.n_random_scalars(private_attributes.len());
+
+//         // kappa_1' = g2 * r_r1 + alpha_P + beta_P * r_mi[0]
+//         let kappa_1_prime = params.gen2() * r_r1
+//             + sp_verification_key.alpha
+//             + sp_verification_key.beta[0] * r_mi[0];
+
+//         // let kappas_a_prime =
+
+//         // kappa_2' = g2 * r_r2 + alpha + beta[0] * r_mi[0] + ... + beta[i] * r_mi[i]
+//         let kappa_2_prime = params.gen2() * r_r2
+//             + verification_key.alpha
+//             + r_mi
+//                 .iter()
+//                 .zip(verification_key.beta.iter())
+//                 .map(|(r_mi, beta_i)| beta_i * r_mi)
+//                 .sum::<G2Projective>();
+
+//         let beta_bytes = verification_key
+//             .beta
+//             .iter()
+//             .map(|beta_i| beta_i.to_bytes())
+//             .collect::<Vec<_>>();
+
+//         // compute challenge: H(kappa_1', kappa_2', g2, alpha_P, beta_P, alpha, betas)
+//         let challenge = compute_challenge::<ChallengeDigest, _, _>(
+//             std::iter::once(kappa_1_prime.to_bytes().as_ref())
+//                 .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref()))
+//                 .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
+//                 .chain(std::iter::once(
+//                     sp_verification_key.alpha.to_bytes().as_ref(),
+//                 ))
+//                 .chain(std::iter::once(
+//                     sp_verification_key.beta[0].to_bytes().as_ref(),
+//                 ))
+//                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
+//                 .chain(beta_bytes.iter().map(|b| b.as_ref())),
+//         );
+
+//         // responses
+//         let s_r1 = produce_response(&r_r1, &challenge, &r1);
+//         let s_r2 = produce_response(&r_r2, &challenge, &r2);
+//         let s_mi = produce_responses(&r_mi, &challenge, private_attributes);
+
+//         SetMembershipProof {
+//             challenge,
+//             kappa_1_prime,
+//             kappa_2_prime,
+//             s_mi,
+//             s_r1,
+//             s_r2,
+//         }
+//     }
+// }
 
 // proof builder:
 // - commitment

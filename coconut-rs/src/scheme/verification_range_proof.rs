@@ -17,7 +17,7 @@
 // use std::convert::TryFrom;
 // use std::convert::TryInto;
 
-// use bls12_381::{G2Prepared, G2Projective};
+use bls12_381::{G2Prepared, G2Projective, Scalar};
 // use group::Curve;
 
 // use crate::error::{CoconutError, Result};
@@ -35,26 +35,50 @@
 // values for u-ary decomposition
 // computed according to paper for [0; 2^16) range
 // tests depend on these values
-const U: usize = 4;
-const L: usize = 8;
+pub const U: usize = 4;
+pub const L: usize = 8;
 
-pub fn compute_u_ary_decomposition(number: u64) -> [u8; L] {
-    let u = U as u64;
+fn scalar_smaller_than_2_16(number: Scalar) -> bool {
+    let number_bytes = number.to_bytes();
 
-    let max = u.pow(L as u32);
-    if number >= max {
-        panic!("number cannot exceed U^L: {}", max);
+    // check that only first 16 bits can be set
+    for byte in number_bytes[2..].iter() {
+        if *byte != 0 {
+            return false;
+        }
     }
 
+    true
+}
+
+// not the most elegant way of casting a scalar into a single u64
+fn scalar_to_u64(number: Scalar) -> u64 {
+    let mut u64_bytes: [u8; 8] = [0; 8];
+    let number_bytes = number.to_bytes();
+
+    u64_bytes.clone_from_slice(&number_bytes[..8]);
+
+    u64::from_le_bytes(u64_bytes)
+}
+
+pub fn compute_u_ary_decomposition(number: Scalar) -> [Scalar; L] {
+    let u = U as u64;
+
+    if !scalar_smaller_than_2_16(number) {
+        panic!("number must be in range [0, 2^16)");
+    }
+
+    let number = scalar_to_u64(number);
+
     let mut remainder = number;
-    let mut decomposition = [0; L];
+    let mut decomposition: [Scalar; L] = [Scalar::from(0); L];
 
     for i in (0..L).rev() {
         let curr_pow = u.pow(i as u32);
         let i_th = remainder / curr_pow as u64;
 
         remainder %= curr_pow;
-        decomposition[i] = i_th as u8;
+        decomposition[i] = Scalar::from(i_th as u64);
     }
 
     // little-endian
@@ -67,70 +91,103 @@ mod tests {
 
     #[test]
     fn compute_u_ary_decomposition_0() {
-        let decomposition = compute_u_ary_decomposition(0);
+        let decomposition = compute_u_ary_decomposition(Scalar::from(0));
 
-        assert_eq!([0; L], decomposition);
+        assert_eq!([Scalar::from(0); L], decomposition);
     }
 
     #[test]
     fn compute_u_ary_decomposition_1() {
-        let decomposition_1 = compute_u_ary_decomposition(1);
-        let decomposition_2 = compute_u_ary_decomposition(2);
-        let decomposition_3 = compute_u_ary_decomposition(3);
+        let decomposition_1 = compute_u_ary_decomposition(Scalar::from(1));
+        let decomposition_2 = compute_u_ary_decomposition(Scalar::from(2));
+        let decomposition_3 = compute_u_ary_decomposition(Scalar::from(3));
 
-        let mut decomposition = [0; L];
+        let mut decomposition = [Scalar::from(0); L];
 
-        decomposition[0] = 1;
+        decomposition[0] = Scalar::from(1);
         assert_eq!(decomposition_1, decomposition);
 
-        decomposition[0] = 2;
+        decomposition[0] = Scalar::from(2);
         assert_eq!(decomposition_2, decomposition);
 
-        decomposition[0] = 3;
+        decomposition[0] = Scalar::from(3);
         assert_eq!(decomposition_3, decomposition);
     }
 
     #[test]
     fn compute_u_ary_decomposition_2() {
-        let decomposition_4 = compute_u_ary_decomposition(4);
-        let decomposition_9 = compute_u_ary_decomposition(9);
-        let decomposition_14 = compute_u_ary_decomposition(14);
+        let decomposition_4 = compute_u_ary_decomposition(Scalar::from(4));
+        let decomposition_9 = compute_u_ary_decomposition(Scalar::from(9));
+        let decomposition_14 = compute_u_ary_decomposition(Scalar::from(14));
 
-        let mut decomposition = [0; L];
+        let mut decomposition = [Scalar::from(0); L];
 
-        decomposition[0] = 0;
-        decomposition[1] = 1;
+        decomposition[0] = Scalar::from(0);
+        decomposition[1] = Scalar::from(1);
         assert_eq!(decomposition_4, decomposition);
 
-        decomposition[0] = 1;
-        decomposition[1] = 2;
+        decomposition[0] = Scalar::from(1);
+        decomposition[1] = Scalar::from(2);
         assert_eq!(decomposition_9, decomposition);
 
-        decomposition[0] = 2;
-        decomposition[1] = 3;
+        decomposition[0] = Scalar::from(2);
+        decomposition[1] = Scalar::from(3);
         assert_eq!(decomposition_14, decomposition);
     }
 
     #[test]
     fn compute_u_ary_decomposition_other() {
         let max = (U as u64).pow(L as u32) - 1;
-        let decomposition_max = compute_u_ary_decomposition(max);
+
+        let decomposition_max = compute_u_ary_decomposition(Scalar::from(max));
 
         let random = 23456;
-        let decomposition_random = compute_u_ary_decomposition(random);
+        let decomposition_random = compute_u_ary_decomposition(Scalar::from(random));
 
-        let decomposition = [3; L];
+        let decomposition = [Scalar::from(3); L];
         assert_eq!(decomposition_max, decomposition);
 
-        let decomposition = [0, 0, 2, 2, 3, 2, 1, 1];
+        let decomposition = [
+            Scalar::from(0),
+            Scalar::from(0),
+            Scalar::from(2),
+            Scalar::from(2),
+            Scalar::from(3),
+            Scalar::from(2),
+            Scalar::from(1),
+            Scalar::from(1),
+        ];
         assert_eq!(decomposition_random, decomposition);
     }
 
     #[test]
-    #[should_panic(expected = "number cannot exceed U^L: 65536")]
+    #[should_panic(expected = "number must be in range [0, 2^16)")]
     fn compute_u_ary_decomposition_overflow_panic() {
         let max = (U as u64).pow(L as u32);
 
-        compute_u_ary_decomposition(max);
+        compute_u_ary_decomposition(Scalar::from(max));
+    }
+
+    #[test]
+    fn compute_u_ary_decomposition_scalar_smaller_than_2_16_tests() {
+        assert!(scalar_smaller_than_2_16(Scalar::from(0)));
+        assert!(scalar_smaller_than_2_16(Scalar::from(1)));
+        assert!(scalar_smaller_than_2_16(Scalar::from(2)));
+        assert!(scalar_smaller_than_2_16(Scalar::from(256)));
+        assert!(scalar_smaller_than_2_16(Scalar::from(65535)));
+
+        assert!(!scalar_smaller_than_2_16(Scalar::from(65536)));
+        assert!(!scalar_smaller_than_2_16(Scalar::from(65537)));
+        assert!(!scalar_smaller_than_2_16(Scalar::from(65538)));
+        assert!(!scalar_smaller_than_2_16(Scalar::from(u64::MAX)));
+    }
+
+    #[test]
+    fn compute_u_ary_decomposition_scalar_to_u64_tests() {
+        let values = [0, 1, 2, 3, 254, 255, 256, 65534, 65535];
+
+        for v in values {
+            assert_eq!(v as u64, scalar_to_u64(Scalar::from(v)));
+        }
     }
 }
