@@ -281,6 +281,8 @@ impl Bytable for RangeTheta {
     }
 }
 
+impl Base58 for RangeTheta {}
+
 fn scalar_smaller_than_2_16(number: Scalar) -> bool {
     let number_bytes = number.to_bytes();
 
