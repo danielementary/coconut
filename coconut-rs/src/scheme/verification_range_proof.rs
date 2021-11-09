@@ -265,6 +265,10 @@ impl RangeTheta {
 
         bytes
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<RangeTheta> {
+        RangeTheta::try_from(bytes)
+    }
 }
 
 fn scalar_smaller_than_2_16(number: Scalar) -> bool {
