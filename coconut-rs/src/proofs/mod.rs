@@ -792,84 +792,147 @@ pub struct RangeProof {
     challenge: Scalar, // to remove later after testing
     kappas_a_prime: Vec<G2Projective>,
     kappas_b_prime: Vec<G2Projective>,
-    kappa_prime: G2Projective,
-    s_mi: Vec<Scalar>,
+    kappa_a_prime: G2Projective,
+    kappa_b_prime: G2Projective,
+    s_m_a: Vec<Scalar>,
+    s_m_b: Vec<Scalar>,
     s_r_a: Vec<Scalar>,
     s_r_b: Vec<Scalar>,
+    s_m: Vec<Scalar>,
     s_r: Scalar,
 }
 
-// impl RangeProof {
-//     pub(crate) fn construct(
-//         params: &Parameters,
-//         verification_key: &VerificationKey,
-//         sp_verification_key: &VerificationKey,
-//         private_attributes: &[Attribute],
-//         r_a: &Vec<Scalar>,
-//         r_b: &Vec<Scalar>,
-//         r: &Scalar,
-//     ) -> Self {
-//         let m = private_attributes[0].0[0] as u64;
-//         let m_a = compute_u_ary_decomposition(private_attributes[0] - a);
-//         let m_b = compute_u_ary_decomposition(private_attributes[0] - b + U.pow(L));
+impl RangeProof {
+    pub(crate) fn construct(
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+        private_attributes: &[Attribute],
+        a: Scalar, // lower bound
+        b: Scalar, // upper bound
+        r_a: &[Scalar; L],
+        r_b: &[Scalar; L],
+        r: &Scalar,
+    ) -> Self {
+        // use first private attribute for range proof
+        let m = private_attributes[0];
+        // compute decompositon for m - a and m - b + U^L
+        let m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
+        let m_b: [Scalar; L] =
+            compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
 
-//         // pick random witnesses
-//         let r_r_a = params.n_random_scalars(L);
-//         let r_r_b = params.n_random_scalars(L);
-//         let r_mi = params.n_random_scalars(private_attributes.len());
+        // pick random values for each witness
+        let r_m = params.n_random_scalars(private_attributes.len() - 1);
 
-//         // kappa_1' = g2 * r_r1 + alpha_P + beta_P * r_mi[0]
-//         let kappa_1_prime = params.gen2() * r_r1
-//             + sp_verification_key.alpha
-//             + sp_verification_key.beta[0] * r_mi[0];
+        let r_m_a = params.n_random_scalars(L);
+        let r_m_b = params.n_random_scalars(L);
 
-//         // let kappas_a_prime =
+        let r_r_a = params.n_random_scalars(L);
+        let r_r_b = params.n_random_scalars(L);
+        let r_r = params.random_scalar();
 
-//         // kappa_2' = g2 * r_r2 + alpha + beta[0] * r_mi[0] + ... + beta[i] * r_mi[i]
-//         let kappa_2_prime = params.gen2() * r_r2
-//             + verification_key.alpha
-//             + r_mi
-//                 .iter()
-//                 .zip(verification_key.beta.iter())
-//                 .map(|(r_mi, beta_i)| beta_i * r_mi)
-//                 .sum::<G2Projective>();
+        // recompute values with corresponding random values
+        let kappas_a_prime: Vec<G2Projective> = r_r_a
+            .iter()
+            .zip(r_m_a.iter())
+            .map(|(r, m)| {
+                params.gen2() * r + sp_verification_key.alpha + sp_verification_key.beta[0] * m
+            })
+            .collect();
 
-//         let beta_bytes = verification_key
-//             .beta
-//             .iter()
-//             .map(|beta_i| beta_i.to_bytes())
-//             .collect::<Vec<_>>();
+        let kappas_b_prime: Vec<G2Projective> = r_r_b
+            .iter()
+            .zip(r_m_b.iter())
+            .map(|(r, m)| {
+                params.gen2() * r + sp_verification_key.alpha + sp_verification_key.beta[0] * m
+            })
+            .collect();
 
-//         // compute challenge: H(kappa_1', kappa_2', g2, alpha_P, beta_P, alpha, betas)
-//         let challenge = compute_challenge::<ChallengeDigest, _, _>(
-//             std::iter::once(kappa_1_prime.to_bytes().as_ref())
-//                 .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref()))
-//                 .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
-//                 .chain(std::iter::once(
-//                     sp_verification_key.alpha.to_bytes().as_ref(),
-//                 ))
-//                 .chain(std::iter::once(
-//                     sp_verification_key.beta[0].to_bytes().as_ref(),
-//                 ))
-//                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-//                 .chain(beta_bytes.iter().map(|b| b.as_ref())),
-//         );
+        let beta1 = verification_key.beta[0];
+        let partial_kappa: G2Projective = r_m[1..]
+            .iter()
+            .zip(verification_key.beta[1..].iter())
+            .map(|(r_mi, beta_i)| beta_i * r_mi)
+            .sum();
 
-//         // responses
-//         let s_r1 = produce_response(&r_r1, &challenge, &r1);
-//         let s_r2 = produce_response(&r_r2, &challenge, &r2);
-//         let s_mi = produce_responses(&r_mi, &challenge, private_attributes);
+        let kappa_a_prime: G2Projective = params.gen2() * r_r
+            + verification_key.alpha
+            + beta1 * a
+            + r_m_a
+                .iter()
+                .enumerate()
+                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((U as u64).pow(i as u32))))
+                .sum::<G2Projective>()
+            + partial_kappa;
 
-//         SetMembershipProof {
-//             challenge,
-//             kappa_1_prime,
-//             kappa_2_prime,
-//             s_mi,
-//             s_r1,
-//             s_r2,
-//         }
-//     }
-// }
+        let kappa_b_prime: G2Projective = params.gen2() * r_r
+            + verification_key.alpha
+            + beta1 * (b - Scalar::from((U as u64).pow(L as u32)))
+            + r_m_b
+                .iter()
+                .enumerate()
+                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((U as u64).pow(i as u32))))
+                .sum::<G2Projective>()
+            + partial_kappa;
+
+        let kappas_a_prime_bytes = kappas_a_prime
+            .iter()
+            .map(|k| k.to_bytes())
+            .collect::<Vec<_>>();
+
+        let kappas_b_prime_bytes = kappas_b_prime
+            .iter()
+            .map(|k| k.to_bytes())
+            .collect::<Vec<_>>();
+
+        let beta_bytes = verification_key.beta[1..]
+            .iter()
+            .map(|b| b.to_bytes())
+            .collect::<Vec<_>>();
+
+        // derive challenge
+        let challenge = compute_challenge::<ChallengeDigest, _, _>(
+            kappas_a_prime_bytes
+                .iter()
+                .map(|b| b.as_ref())
+                .chain(kappas_b_prime_bytes.iter().map(|b| b.as_ref()))
+                .chain(std::iter::once(kappa_a_prime.to_bytes().as_ref()))
+                .chain(std::iter::once(kappa_b_prime.to_bytes().as_ref()))
+                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
+                .chain(std::iter::once(
+                    sp_verification_key.alpha.to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(
+                    sp_verification_key.beta[0].to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
+                .chain(beta_bytes.iter().map(|b| b.as_ref())),
+        );
+
+        let s_m_a = produce_responses(&r_m_a, &challenge, &m_a);
+        let s_m_b = produce_responses(&r_m_b, &challenge, &m_b);
+
+        let s_r_a = produce_responses(&r_r_a, &challenge, r_a);
+        let s_r_b = produce_responses(&r_r_b, &challenge, r_b);
+
+        let s_m = produce_responses(&r_m, &challenge, &private_attributes[1..]);
+        let s_r = produce_response(&r_r, &challenge, r);
+
+        RangeProof {
+            challenge,
+            kappas_a_prime,
+            kappas_b_prime,
+            kappa_a_prime,
+            kappa_b_prime,
+            s_m_a,
+            s_m_b,
+            s_r_a,
+            s_r_b,
+            s_m,
+            s_r,
+        }
+    }
+}
 
 // proof builder:
 // - commitment
