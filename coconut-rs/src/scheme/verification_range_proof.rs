@@ -271,6 +271,16 @@ impl RangeTheta {
     }
 }
 
+impl Bytable for RangeTheta {
+    fn to_byte_vec(&self) -> Vec<u8> {
+        self.to_bytes()
+    }
+
+    fn try_from_byte_slice(slice: &[u8]) -> Result<Self> {
+        RangeTheta::try_from(slice)
+    }
+}
+
 fn scalar_smaller_than_2_16(number: Scalar) -> bool {
     let number_bytes = number.to_bytes();
 
