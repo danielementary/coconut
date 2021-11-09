@@ -1095,9 +1095,147 @@ impl RangeProof {
             bytes.extend_from_slice(&s.to_bytes());
         }
 
+        bytes.extend_from_slice(&self.s_m.len().to_le_bytes());
+        for m in &self.s_m {
+            bytes.extend_from_slice(&m.to_bytes());
+        }
+
         bytes.extend_from_slice(&self.s_r.to_bytes());
 
         bytes
+    }
+
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let min_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
+            + 4 * L * SCALAR_SIZE
+            + SCALAR_SIZE
+            + SCALAR_SIZE
+            + SCALAR_SIZE;
+
+        if bytes.len() < min_size || (bytes.len() - min_size) % SCALAR_SIZE != 0 {
+            return Err(CoconutError::DeserializationInvalidLength {
+                actual: bytes.len(),
+                modulus_target: bytes.len() - min_size,
+                modulus: SCALAR_SIZE,
+                object:
+                    "kappas_a', kappas_b', kappa_a', kappa_b', s_m_a, s_m_b, s_r_a, s_r_b, s_m, s_r"
+                        .to_string(),
+                target: min_size,
+            });
+        }
+
+        let mut p = 0;
+
+        let mut kappas_a_prime: [G2Projective; L] = [G2Projective::default(); L];
+        for i in 0..L {
+            let kappas_a_prime_i_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+            kappas_a_prime[i] = try_deserialize_g2_projective(
+                &kappas_a_prime_i_bytes,
+                CoconutError::Deserialization("failed to deserialize kappas_a_prime".to_string()),
+            )?;
+
+            p += G2PCOMPRESSED_SIZE;
+        }
+        let kappas_a_prime = kappas_a_prime.to_vec();
+
+        let mut kappas_b_prime: [G2Projective; L] = [G2Projective::default(); L];
+        for i in 0..L {
+            let kappas_b_prime_i_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+            kappas_b_prime[i] = try_deserialize_g2_projective(
+                &kappas_b_prime_i_bytes,
+                CoconutError::Deserialization("failed to deserialize kappas_b_prime".to_string()),
+            )?;
+
+            p += G2PCOMPRESSED_SIZE;
+        }
+        let kappas_b_prime = kappas_b_prime.to_vec();
+
+        let kappa_a_prime_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+        p += G2PCOMPRESSED_SIZE;
+
+        let kappa_a_prime = try_deserialize_g2_projective(
+            &kappa_a_prime_bytes,
+            CoconutError::Deserialization("failed to deserialize kappa_a'".to_string()),
+        )?;
+
+        let kappa_b_prime_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+        p += G2PCOMPRESSED_SIZE;
+
+        let kappa_b_prime = try_deserialize_g2_projective(
+            &kappa_b_prime_bytes,
+            CoconutError::Deserialization("failed to deserialize kappa_b'".to_string()),
+        )?;
+
+        let p_next = p + L * SCALAR_SIZE;
+        let s_m_a = try_deserialize_scalar_vec(
+            L as u64,
+            &bytes[p..p_next],
+            CoconutError::Deserialization("Failed to deserialize s_m_a".to_string()),
+        )?;
+        p = p_next;
+
+        let p_next = p + L * SCALAR_SIZE;
+        let s_m_b = try_deserialize_scalar_vec(
+            L as u64,
+            &bytes[p..p_next],
+            CoconutError::Deserialization("Failed to deserialize s_m_b".to_string()),
+        )?;
+        p = p_next;
+
+        let p_next = p + L * SCALAR_SIZE;
+        let s_r_a = try_deserialize_scalar_vec(
+            L as u64,
+            &bytes[p..p_next],
+            CoconutError::Deserialization("Failed to deserialize s_r_a".to_string()),
+        )?;
+        p = p_next;
+
+        let p_next = p + L * SCALAR_SIZE;
+        let s_r_b = try_deserialize_scalar_vec(
+            L as u64,
+            &bytes[p..p_next],
+            CoconutError::Deserialization("Failed to deserialize s_r_b".to_string()),
+        )?;
+        p = p_next;
+
+        let s_m_len = u64::from_le_bytes(bytes[p..p + USIZE_SIZE].try_into().unwrap());
+        p += USIZE_SIZE;
+
+        let p_temp = p + (s_m_len as usize) * SCALAR_SIZE;
+        let s_m = try_deserialize_scalar_vec(
+            s_m_len,
+            &bytes[p..p_temp],
+            CoconutError::Deserialization("Failed to deserialize s_m".to_string()),
+        )?;
+        p = p_temp;
+
+        let s_r_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let s_r = try_deserialize_scalar(
+            &s_r_bytes,
+            CoconutError::Deserialization("failed to deserialize the s_r".to_string()),
+        )?;
+
+        let challenge_bytes = bytes[p..].try_into().unwrap();
+        let challenge = try_deserialize_scalar(
+            &challenge_bytes,
+            CoconutError::Deserialization("failed to deserialize the challenge".to_string()),
+        )?;
+
+        Ok(RangeProof {
+            challenge,
+            kappas_a_prime,
+            kappas_b_prime,
+            kappa_a_prime,
+            kappa_b_prime,
+            s_m_a,
+            s_m_b,
+            s_r_a,
+            s_r_b,
+            s_m,
+            s_r,
+        })
     }
 }
 
