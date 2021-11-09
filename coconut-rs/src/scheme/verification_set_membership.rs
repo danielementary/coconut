@@ -87,15 +87,13 @@ impl SetMembershipTheta {
         params: &Parameters,
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
-        kappa_1: &G2Projective,
-        kappa_2: &G2Projective,
     ) -> bool {
         self.pi.verify(
             params,
             verification_key,
-            &sp_verification_key,
-            &kappa_1,
-            &kappa_2,
+            sp_verification_key,
+            &self.kappa_1,
+            &self.kappa_2,
         )
     }
 
@@ -238,13 +236,7 @@ pub fn verify_set_membership_credential(
         return false;
     }
 
-    if !theta.verify_proof(
-        params,
-        verification_key,
-        sp_verification_key,
-        &theta.kappa_1,
-        &theta.kappa_2,
-    ) {
+    if !theta.verify_proof(params, verification_key, sp_verification_key) {
         return false;
     }
 

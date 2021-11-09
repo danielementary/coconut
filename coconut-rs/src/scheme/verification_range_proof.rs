@@ -33,6 +33,12 @@ use crate::utils::RawAttribute;
 use crate::utils::{try_deserialize_g2_projective, try_deserialize_scalar};
 use crate::Attribute;
 
+// values for u-ary decomposition
+// computed according to paper for [0; 2^16) range
+// tests depend on these values
+pub const U: usize = 4;
+pub const L: usize = 8;
+
 const G2PCOMPRESSED_SIZE: usize = 96;
 const USIZE_SIZE: usize = size_of::<usize>();
 const SCALAR_SIZE: usize = size_of::<Scalar>();
@@ -47,8 +53,10 @@ pub struct RangeTheta {
     pub kappas_b: Vec<G2Projective>,
     pub a_prime_a: Vec<Signature>,
     pub a_prime_b: Vec<Signature>,
-    pub kappa: G2Projective,
-    pub sigma_prime: Signature,
+    pub kappa_a: G2Projective,
+    pub kappa_b: G2Projective,
+    pub sigma_prime_a: Signature,
+    pub sigma_prime_b: Signature,
     pub pi: RangeProof,
 }
 
@@ -122,15 +130,26 @@ impl TryFrom<&[u8]> for RangeTheta {
         }
         let a_prime_b = a_prime_b.to_vec();
 
-        let kappa_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        let kappa_a_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
         p += SCALAR_SIZE;
 
-        let kappa = try_deserialize_g2_projective(
-            &kappa_bytes,
-            CoconutError::Deserialization("failed to deserialize kappa".to_string()),
+        let kappa_a = try_deserialize_g2_projective(
+            &kappa_a_bytes,
+            CoconutError::Deserialization("failed to deserialize kappa_a".to_string()),
         )?;
 
-        let sigma_prime = Signature::try_from(&bytes[p..p + SIGNATURE_SIZE])?;
+        let kappa_b_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let kappa_b = try_deserialize_g2_projective(
+            &kappa_b_bytes,
+            CoconutError::Deserialization("failed to deserialize kappa_b".to_string()),
+        )?;
+
+        let sigma_prime_a = Signature::try_from(&bytes[p..p + SIGNATURE_SIZE])?;
+        p += SIGNATURE_SIZE;
+
+        let sigma_prime_b = Signature::try_from(&bytes[p..p + SIGNATURE_SIZE])?;
         p += SIGNATURE_SIZE;
 
         let pi = RangeProof::from_bytes(&bytes[p..])?;
@@ -142,18 +161,35 @@ impl TryFrom<&[u8]> for RangeTheta {
             kappas_b,
             a_prime_a,
             a_prime_b,
-            kappa,
-            sigma_prime,
+            kappa_a,
+            kappa_b,
+            sigma_prime_a,
+            sigma_prime_b,
             pi,
         })
     }
 }
 
-// values for u-ary decomposition
-// computed according to paper for [0; 2^16) range
-// tests depend on these values
-pub const U: usize = 4;
-pub const L: usize = 8;
+impl RangeTheta {
+    fn verify_proof(
+        &self,
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+    ) -> bool {
+        self.pi.verify(
+            params,
+            verification_key,
+            sp_verification_key,
+            self.a,
+            self.b,
+            &self.kappas_a,
+            &self.kappas_b,
+            &self.kappa_a,
+            &self.kappa_b,
+        )
+    }
+}
 
 fn scalar_smaller_than_2_16(number: Scalar) -> bool {
     let number_bytes = number.to_bytes();
