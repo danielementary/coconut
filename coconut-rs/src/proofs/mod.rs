@@ -847,31 +847,35 @@ impl RangeProof {
             .collect();
 
         let beta1 = verification_key.beta[0];
-        let partial_kappa: G2Projective = r_m[1..]
-            .iter()
-            .zip(verification_key.beta[1..].iter())
-            .map(|(r_mi, beta_i)| beta_i * r_mi)
-            .sum();
 
-        let kappa_a_prime: G2Projective = params.gen2() * r_r1
+        let mut kappa_a_prime: G2Projective = params.gen2() * r_r1
             + verification_key.alpha
             + beta1 * a
             + r_m_a
                 .iter()
                 .enumerate()
                 .map(|(i, r_m)| beta1 * r_m * (Scalar::from((U as u64).pow(i as u32))))
-                .sum::<G2Projective>()
-            + partial_kappa;
+                .sum::<G2Projective>();
 
-        let kappa_b_prime: G2Projective = params.gen2() * r_r2
+        let mut kappa_b_prime: G2Projective = params.gen2() * r_r2
             + verification_key.alpha
             + beta1 * (b - Scalar::from((U as u64).pow(L as u32)))
             + r_m_b
                 .iter()
                 .enumerate()
                 .map(|(i, r_m)| beta1 * r_m * (Scalar::from((U as u64).pow(i as u32))))
-                .sum::<G2Projective>()
-            + partial_kappa;
+                .sum::<G2Projective>();
+
+        if private_attributes.len() > 1 {
+            let partial_kappa: G2Projective = r_m[1..]
+                .iter()
+                .zip(verification_key.beta[1..].iter())
+                .map(|(r_mi, beta_i)| beta_i * r_mi)
+                .sum();
+
+            kappa_a_prime += partial_kappa;
+            kappa_b_prime += partial_kappa;
+        }
 
         let kappas_a_prime_bytes = kappas_a_prime
             .iter()
@@ -1018,14 +1022,9 @@ impl RangeProof {
             .collect::<Vec<_>>();
 
         let beta1 = verification_key.beta[0];
-        let partial_kappa: G2Projective = self.s_m[1..]
-            .iter()
-            .zip(verification_key.beta[1..].iter())
-            .map(|(s_mi, beta_i)| beta_i * s_mi)
-            .sum();
 
         let kappa_a_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_a_prime;
-        let kappa_a_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_a) * challenge
+        let mut kappa_a_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_a) * challenge
             + params.gen2() * self.s_r1
             + beta1 * a
             + beta1
@@ -1035,13 +1034,12 @@ impl RangeProof {
                 .iter()
                 .enumerate()
                 .map(|(i, s_m)| beta1 * s_m * (Scalar::from((U as u64).pow(i as u32))))
-                .sum::<G2Projective>()
-            + partial_kappa;
+                .sum::<G2Projective>();
 
         let beta1_b_ul = beta1 * b + beta1 * (-Scalar::from((U as u64).pow(L as u32)));
 
         let kappa_b_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_b_prime;
-        let kappa_b_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_b) * challenge
+        let mut kappa_b_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_b) * challenge
             + params.gen2() * self.s_r2
             + beta1_b_ul
             + beta1_b_ul * (-challenge)
@@ -1050,8 +1048,18 @@ impl RangeProof {
                 .iter()
                 .enumerate()
                 .map(|(i, s_m)| beta1 * s_m * (Scalar::from((U as u64).pow(i as u32))))
-                .sum::<G2Projective>()
-            + partial_kappa;
+                .sum::<G2Projective>();
+
+        if self.s_m.len() > 1 {
+            let partial_kappa: G2Projective = self.s_m[1..]
+                .iter()
+                .zip(verification_key.beta[1..].iter())
+                .map(|(s_mi, beta_i)| beta_i * s_mi)
+                .sum();
+
+            kappa_a_rhs += partial_kappa;
+            kappa_b_rhs += partial_kappa;
+        }
 
         kappas_a_lhs == kappas_a_rhs
             && kappas_b_lhs == kappas_b_rhs
