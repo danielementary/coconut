@@ -446,7 +446,7 @@ pub fn prove_credential_and_range(
     })
 }
 
-pub fn verify_set_membership_credential(
+pub fn verify_range_credential(
     params: &Parameters,
     verification_key: &VerificationKey,
     sp_verification_key: &VerificationKey,
