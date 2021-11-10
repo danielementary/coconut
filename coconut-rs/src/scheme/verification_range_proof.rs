@@ -345,7 +345,7 @@ fn pick_range_signature(m: Scalar, signatures: &SpSignatures) -> Signature {
         .clone()
 }
 
-fn pick_range_signatures(ms: &[Scalar; L], signatures: &SpSignatures) -> [Signature; L] {
+pub fn pick_range_signatures(ms: &[Scalar; L], signatures: &SpSignatures) -> [Signature; L] {
     ms.iter()
         .map(|m| pick_range_signature(*m, signatures))
         .collect::<Vec<_>>()[..L]
