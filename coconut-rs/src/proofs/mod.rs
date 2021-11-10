@@ -799,7 +799,8 @@ pub struct RangeProof {
     s_r_a: Vec<Scalar>,
     s_r_b: Vec<Scalar>,
     s_m: Vec<Scalar>,
-    s_r: Scalar,
+    s_r1: Scalar,
+    s_r2: Scalar,
 }
 
 impl RangeProof {
@@ -810,17 +811,13 @@ impl RangeProof {
         private_attributes: &[Attribute],
         a: Scalar, // lower bound
         b: Scalar, // upper bound
+        m_a: &[Scalar; L],
+        m_b: &[Scalar; L],
         r_a: &[Scalar; L],
         r_b: &[Scalar; L],
-        r: &Scalar,
+        r1: &Scalar,
+        r2: &Scalar,
     ) -> Self {
-        // use first private attribute for range proof
-        let m = private_attributes[0];
-        // compute decompositon for m - a and m - b + U^L
-        let m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
-        let m_b: [Scalar; L] =
-            compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
-
         // pick random values for each witness
         let r_m = params.n_random_scalars(private_attributes.len() - 1);
 
@@ -829,7 +826,8 @@ impl RangeProof {
 
         let r_r_a = params.n_random_scalars(L);
         let r_r_b = params.n_random_scalars(L);
-        let r_r = params.random_scalar();
+        let r_r1 = params.random_scalar();
+        let r_r2 = params.random_scalar();
 
         // recompute values with corresponding random values
         let kappas_a_prime: Vec<G2Projective> = r_r_a
@@ -855,7 +853,7 @@ impl RangeProof {
             .map(|(r_mi, beta_i)| beta_i * r_mi)
             .sum();
 
-        let kappa_a_prime: G2Projective = params.gen2() * r_r
+        let kappa_a_prime: G2Projective = params.gen2() * r_r1
             + verification_key.alpha
             + beta1 * a
             + r_m_a
@@ -865,7 +863,7 @@ impl RangeProof {
                 .sum::<G2Projective>()
             + partial_kappa;
 
-        let kappa_b_prime: G2Projective = params.gen2() * r_r
+        let kappa_b_prime: G2Projective = params.gen2() * r_r2
             + verification_key.alpha
             + beta1 * (b - Scalar::from((U as u64).pow(L as u32)))
             + r_m_b
@@ -910,14 +908,15 @@ impl RangeProof {
         );
 
         // compute responses
-        let s_m_a = produce_responses(&r_m_a, &challenge, &m_a);
-        let s_m_b = produce_responses(&r_m_b, &challenge, &m_b);
+        let s_m_a = produce_responses(&r_m_a, &challenge, m_a);
+        let s_m_b = produce_responses(&r_m_b, &challenge, m_b);
 
         let s_r_a = produce_responses(&r_r_a, &challenge, r_a);
         let s_r_b = produce_responses(&r_r_b, &challenge, r_b);
 
         let s_m = produce_responses(&r_m, &challenge, &private_attributes[1..]);
-        let s_r = produce_response(&r_r, &challenge, r);
+        let s_r1 = produce_response(&r_r1, &challenge, r1);
+        let s_r2 = produce_response(&r_r2, &challenge, r2);
 
         RangeProof {
             challenge,
@@ -930,7 +929,8 @@ impl RangeProof {
             s_r_a,
             s_r_b,
             s_m,
-            s_r,
+            s_r1,
+            s_r2,
         }
     }
 
@@ -945,8 +945,8 @@ impl RangeProof {
         sp_verification_key: &VerificationKey,
         a: Scalar, // lower bound
         b: Scalar, // upper bound
-        kappas_a: &Vec<G2Projective>,
-        kappas_b: &Vec<G2Projective>,
+        kappas_a: &[G2Projective],
+        kappas_b: &[G2Projective],
         kappa_a: &G2Projective,
         kappa_b: &G2Projective,
     ) -> bool {
@@ -1026,7 +1026,7 @@ impl RangeProof {
 
         let kappa_a_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_a_prime;
         let kappa_a_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_a) * challenge
-            + params.gen2() * self.s_r
+            + params.gen2() * self.s_r1
             + beta1 * a
             + beta1
             + beta1 * (-challenge)
@@ -1042,7 +1042,7 @@ impl RangeProof {
 
         let kappa_b_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_b_prime;
         let kappa_b_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_b) * challenge
-            + params.gen2() * self.s_r
+            + params.gen2() * self.s_r2
             + beta1_b_ul
             + beta1_b_ul * (-challenge)
             + self
@@ -1100,7 +1100,8 @@ impl RangeProof {
             bytes.extend_from_slice(&m.to_bytes());
         }
 
-        bytes.extend_from_slice(&self.s_r.to_bytes());
+        bytes.extend_from_slice(&self.s_r1.to_bytes());
+        bytes.extend_from_slice(&self.s_r2.to_bytes());
 
         bytes
     }
@@ -1108,6 +1109,7 @@ impl RangeProof {
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let min_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
             + 4 * L * SCALAR_SIZE
+            + SCALAR_SIZE
             + SCALAR_SIZE
             + SCALAR_SIZE
             + SCALAR_SIZE;
@@ -1118,7 +1120,7 @@ impl RangeProof {
                 modulus_target: bytes.len() - min_size,
                 modulus: SCALAR_SIZE,
                 object:
-                    "kappas_a', kappas_b', kappa_a', kappa_b', s_m_a, s_m_b, s_r_a, s_r_b, s_m, s_r"
+                    "kappas_a', kappas_b', kappa_a', kappa_b', s_m_a, s_m_b, s_r_a, s_r_b, s_m, s_r1, s_r2"
                         .to_string(),
                 target: min_size,
             });
@@ -1209,12 +1211,20 @@ impl RangeProof {
         )?;
         p = p_temp;
 
-        let s_r_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        let s_r1_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
         p += SCALAR_SIZE;
 
-        let s_r = try_deserialize_scalar(
-            &s_r_bytes,
-            CoconutError::Deserialization("failed to deserialize the s_r".to_string()),
+        let s_r1 = try_deserialize_scalar(
+            &s_r1_bytes,
+            CoconutError::Deserialization("failed to deserialize the s_r1".to_string()),
+        )?;
+
+        let s_r2_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
+        p += SCALAR_SIZE;
+
+        let s_r2 = try_deserialize_scalar(
+            &s_r2_bytes,
+            CoconutError::Deserialization("failed to deserialize the s_r2".to_string()),
         )?;
 
         let challenge_bytes = bytes[p..].try_into().unwrap();
@@ -1234,7 +1244,8 @@ impl RangeProof {
             s_r_a,
             s_r_b,
             s_m,
-            s_r,
+            s_r1,
+            s_r2,
         })
     }
 }
