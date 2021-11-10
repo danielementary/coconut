@@ -50,10 +50,10 @@ const SIGNATURE_SIZE: usize = 96;
 pub struct RangeTheta {
     pub a: Scalar, // lower bound
     pub b: Scalar, // upper bound
-    pub kappas_a: Vec<G2Projective>,
-    pub kappas_b: Vec<G2Projective>,
-    pub a_prime_a: Vec<Signature>,
-    pub a_prime_b: Vec<Signature>,
+    pub kappas_a: [G2Projective; L],
+    pub kappas_b: [G2Projective; L],
+    pub a_prime_a: [Signature; L],
+    pub a_prime_b: [Signature; L],
     pub kappa_a: G2Projective,
     pub kappa_b: G2Projective,
     pub sigma_prime_a: Signature,
@@ -99,7 +99,6 @@ impl TryFrom<&[u8]> for RangeTheta {
 
             p += G2PCOMPRESSED_SIZE;
         }
-        let kappas_a = kappas_a.to_vec();
 
         let mut kappas_b: [G2Projective; L] = [G2Projective::default(); L];
         for i in 0..L {
@@ -111,7 +110,6 @@ impl TryFrom<&[u8]> for RangeTheta {
 
             p += G2PCOMPRESSED_SIZE;
         }
-        let kappas_b = kappas_b.to_vec();
 
         let mut a_prime_a: [Signature; L] =
             [Signature(G1Projective::default(), G1Projective::default()); L];
@@ -120,7 +118,6 @@ impl TryFrom<&[u8]> for RangeTheta {
 
             p += G2PCOMPRESSED_SIZE;
         }
-        let a_prime_a = a_prime_a.to_vec();
 
         let mut a_prime_b: [Signature; L] =
             [Signature(G1Projective::default(), G1Projective::default()); L];
@@ -129,7 +126,6 @@ impl TryFrom<&[u8]> for RangeTheta {
 
             p += G2PCOMPRESSED_SIZE;
         }
-        let a_prime_b = a_prime_b.to_vec();
 
         let kappa_a_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
         p += SCALAR_SIZE;
@@ -339,6 +335,183 @@ pub fn compute_u_ary_decomposition(number: Scalar) -> [Scalar; L] {
 
     // little-endian
     decomposition
+}
+
+fn pick_range_signature(m: Scalar, signatures: &SpSignatures) -> Signature {
+    signatures
+        .signatures
+        .get(&RawAttribute::Number(scalar_to_u64(m)))
+        .unwrap()
+        .clone()
+}
+
+fn pick_range_signatures(ms: &[Scalar; L], signatures: &SpSignatures) -> [Signature; L] {
+    ms.iter()
+        .map(|m| pick_range_signature(*m, signatures))
+        .collect::<Vec<_>>()[..L]
+        .try_into()
+        .unwrap()
+}
+
+pub fn prove_credential_and_range(
+    params: &Parameters,
+    verification_key: &VerificationKey,
+    sp_verification_key: &VerificationKey,
+    signature: &Signature,
+    all_range_signatures: &SpSignatures,
+    a: Scalar, // lower bound
+    b: Scalar, // upper bound
+    private_attributes: &[Attribute],
+) -> Result<RangeTheta> {
+    if private_attributes.is_empty() {
+        return Err(CoconutError::Verification(
+            "Tried to prove a credential with an empty set of private attributes".to_string(),
+        ));
+    }
+
+    if private_attributes.len() > verification_key.beta.len() {
+        return Err(
+            CoconutError::Verification(
+                format!("Tried to prove a credential for higher than supported by the provided verification key number of attributes (max: {}, requested: {})",
+                        verification_key.beta.len(),
+                        private_attributes.len()
+                )));
+    }
+
+    // use first private attribute for range proof
+    let m = private_attributes[0];
+    // compute decompositon for m - a and m - b + U^L
+    let m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
+    let m_b: [Scalar; L] =
+        compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
+
+    let a_a = pick_range_signatures(&m_a, all_range_signatures);
+    let a_b = pick_range_signatures(&m_b, all_range_signatures);
+
+    let (a_prime_a, r_a): (Vec<_>, Vec<_>) = a_a.iter().map(|a| a.randomise(&params)).unzip();
+    let a_prime_a: [Signature; L] = a_prime_a.try_into().unwrap();
+    let r_a: [Scalar; L] = r_a.try_into().unwrap();
+
+    let (a_prime_b, r_b): (Vec<_>, Vec<_>) = a_b.iter().map(|a| a.randomise(&params)).unzip();
+    let a_prime_b: [Signature; L] = a_prime_b.try_into().unwrap();
+    let r_b: [Scalar; L] = r_b.try_into().unwrap();
+
+    let (sigma_prime_a, r1) = signature.randomise(&params);
+    let (sigma_prime_b, r2) = signature.randomise(&params);
+
+    let kappas_a: Vec<_> = r_a
+        .iter()
+        .enumerate()
+        .map(|(i, r)| compute_kappa(params, sp_verification_key, &m_a[i..], *r))
+        .collect();
+    let kappas_a = kappas_a.try_into().unwrap();
+
+    let kappas_b: Vec<_> = r_b
+        .iter()
+        .enumerate()
+        .map(|(i, r)| compute_kappa(params, sp_verification_key, &m_b[i..], *r))
+        .collect();
+    let kappas_b = kappas_b.try_into().unwrap();
+
+    let kappa_a = compute_kappa(params, verification_key, private_attributes, r1);
+    let kappa_b = compute_kappa(params, verification_key, private_attributes, r2);
+
+    let pi = RangeProof::construct(
+        params,
+        verification_key,
+        sp_verification_key,
+        private_attributes,
+        a,
+        b,
+        &m_a,
+        &m_b,
+        &r_a,
+        &r_b,
+        &r1,
+        &r2,
+    );
+
+    Ok(RangeTheta {
+        a,
+        b,
+        kappas_a,
+        kappas_b,
+        a_prime_a,
+        a_prime_b,
+        kappa_a,
+        kappa_b,
+        sigma_prime_a,
+        sigma_prime_b,
+        pi,
+    })
+}
+
+pub fn verify_set_membership_credential(
+    params: &Parameters,
+    verification_key: &VerificationKey,
+    sp_verification_key: &VerificationKey,
+    theta: &RangeTheta,
+    public_attributes: &[Attribute],
+) -> bool {
+    if public_attributes.len() + theta.pi.private_attributes() > verification_key.beta.len() {
+        return false;
+    }
+
+    if !theta.verify_proof(params, verification_key, sp_verification_key) {
+        return false;
+    }
+
+    for a in theta.a_prime_a {
+        if bool::from(a.0.is_identity()) {
+            return false;
+        }
+    }
+
+    for a in theta.a_prime_b {
+        if bool::from(a.0.is_identity()) {
+            return false;
+        }
+    }
+
+    if bool::from(theta.sigma_prime_a.0.is_identity())
+        || bool::from(theta.sigma_prime_b.0.is_identity())
+    {
+        return false;
+    }
+
+    for (a, k) in theta.a_prime_a.iter().zip(theta.kappas_a) {
+        if !check_bilinear_pairing(
+            &a.0.to_affine(),
+            &G2Prepared::from(k.to_affine()),
+            &(a.1).to_affine(),
+            params.prepared_miller_g2(),
+        ) {
+            return false;
+        }
+    }
+
+    for (a, k) in theta.a_prime_b.iter().zip(theta.kappas_b) {
+        if !check_bilinear_pairing(
+            &a.0.to_affine(),
+            &G2Prepared::from(k.to_affine()),
+            &(a.1).to_affine(),
+            params.prepared_miller_g2(),
+        ) {
+            return false;
+        }
+    }
+
+    check_bilinear_pairing(
+        &theta.sigma_prime_a.0.to_affine(),
+        &G2Prepared::from(theta.kappa_a.to_affine()),
+        &(theta.sigma_prime_a.1).to_affine(),
+        params.prepared_miller_g2(),
+    ) && check_bilinear_pairing(
+        &theta.sigma_prime_b.0.to_affine(),
+        &G2Prepared::from(theta.kappa_b.to_affine()),
+        &(theta.sigma_prime_b.1).to_affine(),
+        params.prepared_miller_g2(),
+    )
 }
 
 #[cfg(test)]
