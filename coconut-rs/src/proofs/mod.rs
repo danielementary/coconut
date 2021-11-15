@@ -1026,7 +1026,8 @@ impl RangeProof {
         let beta1 = verification_key.beta[0];
 
         let kappa_a_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_a_prime;
-        let mut kappa_a_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_a) * challenge
+        let mut kappa_a_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_a + beta1 * -a)
+            * challenge
             + params.gen2() * self.s_r1
             + beta1 * a
             + self
@@ -1036,12 +1037,13 @@ impl RangeProof {
                 .map(|(i, s_m)| beta1 * s_m * (Scalar::from((U as u64).pow(i as u32))))
                 .sum::<G2Projective>();
 
-        let beta1_b_ul = beta1 * b + beta1 * (-Scalar::from((U as u64).pow(L as u32)));
-
         let kappa_b_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_b_prime;
-        let mut kappa_b_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_b) * challenge
+        let mut kappa_b_rhs = (verification_key.alpha * (-Scalar::one())
+            + kappa_b
+            + beta1 * -(b - Scalar::from((U as u64).pow(L as u32))))
+            * challenge
             + params.gen2() * self.s_r2
-            + beta1_b_ul
+            + beta1 * (b - Scalar::from((U as u64).pow(L as u32)))
             + self
                 .s_m_b
                 .iter()
@@ -1059,9 +1061,6 @@ impl RangeProof {
             kappa_a_rhs += partial_kappa;
             kappa_b_rhs += partial_kappa;
         }
-
-        assert_eq!(kappa_a_lhs, kappa_a_rhs);
-        assert_eq!(kappa_b_lhs, kappa_b_rhs);
 
         kappas_a_lhs == kappas_a_rhs
             && kappas_b_lhs == kappas_b_rhs
