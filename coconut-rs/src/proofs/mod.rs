@@ -1581,6 +1581,7 @@ mod tests {
 
     #[test]
     fn range_proof_correctness_1() {
+        // init parameters for 1 message credential
         let params = setup(1).unwrap();
 
         // define one single private attribute
@@ -1588,25 +1589,30 @@ mod tests {
         let m = Scalar::from(private_attribute);
         let private_attributes = [m];
 
+        // define lower and upper bound for range proof
         let a = Scalar::from(5);
         let b = Scalar::from(15);
 
+        // issue signatures for all base u elements
         let all_range_signatures = issue_range_signatures(&params);
         let sp_verification_key = &all_range_signatures.sp_verification_key;
 
+        // compute u-ary decomposition for m-a and m-b+u^l
         let m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
         let m_b: [Scalar; L] =
             compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
 
+        // pick corresponding signatures for each of the base elements
         let a_a = pick_range_signatures(&m_a, &all_range_signatures);
         let a_b = pick_range_signatures(&m_b, &all_range_signatures);
 
+        // "randomise" signatures
         let (a_prime_a, r_a): (Vec<_>, Vec<_>) = a_a.iter().map(|a| a.randomise(&params)).unzip();
-        let a_prime_a: [Signature; L] = a_prime_a.try_into().unwrap();
+        let _a_prime_a: [Signature; L] = a_prime_a.try_into().unwrap();
         let r_a: [Scalar; L] = r_a.try_into().unwrap();
 
         let (a_prime_b, r_b): (Vec<_>, Vec<_>) = a_b.iter().map(|a| a.randomise(&params)).unzip();
-        let a_prime_b: [Signature; L] = a_prime_b.try_into().unwrap();
+        let _a_prime_b: [Signature; L] = a_prime_b.try_into().unwrap();
         let r_b: [Scalar; L] = r_b.try_into().unwrap();
 
         // simulate a valid signature on attribute
@@ -1619,9 +1625,10 @@ mod tests {
                 + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
         );
 
-        let (sigma_prime_a, r1) = signature.randomise(&params);
-        let (sigma_prime_b, r2) = signature.randomise(&params);
+        let (_sigma_prime_a, r1) = signature.randomise(&params);
+        let (_sigma_prime_b, r2) = signature.randomise(&params);
 
+        // compute kappas
         let kappas_a: Vec<_> = r_a
             .iter()
             .enumerate()
@@ -1649,6 +1656,7 @@ mod tests {
             r2,
         );
 
+        // construct proof
         let pi = RangeProof::construct(
             &params,
             &key_pair.verification_key(),
@@ -1664,6 +1672,7 @@ mod tests {
             &r2,
         );
 
+        // verify that constructed proof is a valid one
         assert!(pi.verify(
             &params,
             &key_pair.verification_key(),
@@ -1675,5 +1684,166 @@ mod tests {
             &kappa_a,
             &kappa_b,
         ));
+    }
+
+    #[test]
+    fn range_proof_correctness_2() {
+        // init parameters for 2 message credential
+        let params = setup(1).unwrap();
+
+        // define two private attributes but only the first one is used for range proof
+        let private_attribute = 10;
+        let m = Scalar::from(private_attribute);
+        let private_attributes = [m, params.random_scalar()];
+
+        // define lower and upper bound for range proof
+        let a = Scalar::from(5);
+        let b = Scalar::from(15);
+
+        // issue signatures for all base u elements
+        let all_range_signatures = issue_range_signatures(&params);
+        let sp_verification_key = &all_range_signatures.sp_verification_key;
+
+        // compute u-ary decomposition for m-a and m-b+u^l
+        let m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
+        let m_b: [Scalar; L] =
+            compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
+
+        // pick corresponding signatures for each of the base elements
+        let a_a = pick_range_signatures(&m_a, &all_range_signatures);
+        let a_b = pick_range_signatures(&m_b, &all_range_signatures);
+
+        // "randomise" signatures
+        let (a_prime_a, r_a): (Vec<_>, Vec<_>) = a_a.iter().map(|a| a.randomise(&params)).unzip();
+        let _a_prime_a: [Signature; L] = a_prime_a.try_into().unwrap();
+        let r_a: [Scalar; L] = r_a.try_into().unwrap();
+
+        let (a_prime_b, r_b): (Vec<_>, Vec<_>) = a_b.iter().map(|a| a.randomise(&params)).unzip();
+        let _a_prime_b: [Signature; L] = a_prime_b.try_into().unwrap();
+        let r_b: [Scalar; L] = r_b.try_into().unwrap();
+
+        // simulate a valid signature on attribute
+        let h = hash_g1("h");
+        let key_pair = keygen(&params);
+
+        let signature = Signature(
+            h,
+            h * key_pair.secret_key().x
+                + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
+        );
+
+        let (_sigma_prime_a, r1) = signature.randomise(&params);
+        let (_sigma_prime_b, r2) = signature.randomise(&params);
+
+        // compute kappas
+        let kappas_a: Vec<_> = r_a
+            .iter()
+            .enumerate()
+            .map(|(i, r)| compute_kappa(&params, sp_verification_key, &m_a[i..], *r))
+            .collect();
+        let kappas_a: [G2Projective; L] = kappas_a.try_into().unwrap();
+
+        let kappas_b: Vec<_> = r_b
+            .iter()
+            .enumerate()
+            .map(|(i, r)| compute_kappa(&params, sp_verification_key, &m_b[i..], *r))
+            .collect();
+        let kappas_b: [G2Projective; L] = kappas_b.try_into().unwrap();
+
+        let kappa_a = compute_kappa(
+            &params,
+            &key_pair.verification_key(),
+            &private_attributes,
+            r1,
+        );
+        let kappa_b = compute_kappa(
+            &params,
+            &key_pair.verification_key(),
+            &private_attributes,
+            r2,
+        );
+
+        // construct proof
+        let pi = RangeProof::construct(
+            &params,
+            &key_pair.verification_key(),
+            sp_verification_key,
+            &private_attributes,
+            a,
+            b,
+            &m_a,
+            &m_b,
+            &r_a,
+            &r_b,
+            &r1,
+            &r2,
+        );
+
+        // verify that constructed proof is a valid one
+        assert!(pi.verify(
+            &params,
+            &key_pair.verification_key(),
+            sp_verification_key,
+            a,
+            b,
+            &kappas_a,
+            &kappas_b,
+            &kappa_a,
+            &kappa_b,
+        ));
+    }
+
+    #[test]
+    #[should_panic]
+    fn range_proof_correctness_out_of_bound_panic_1() {
+        // define two private attributes but only the first one is used for range proof
+        let private_attribute = 10;
+        let m = Scalar::from(private_attribute);
+
+        // define lower and upper bound for range proof
+        let a = Scalar::from(11);
+        let b = Scalar::from(15);
+
+        // compute u-ary decomposition for m-a and m-b+u^l
+        // should panic because the private attribute is not in the given range
+        let _m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
+        let _m_b: [Scalar; L] =
+            compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
+    }
+
+    #[test]
+    #[should_panic]
+    fn range_proof_correctness_out_of_bound_panic_2() {
+        // define two private attributes but only the first one is used for range proof
+        let private_attribute = 10;
+        let m = Scalar::from(private_attribute);
+
+        // define lower and upper bound for range proof
+        let a = Scalar::from(5);
+        let b = Scalar::from(10);
+
+        // compute u-ary decomposition for m-a and m-b+u^l
+        // should panic because the private attribute is not in the given range
+        let _m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
+        let _m_b: [Scalar; L] =
+            compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
+    }
+
+    #[test]
+    #[should_panic]
+    fn range_proof_correctness_out_of_bound_panic_3() {
+        // define two private attributes but only the first one is used for range proof
+        let private_attribute = 10;
+        let m = Scalar::from(private_attribute);
+
+        // define lower and upper bound for range proof
+        let a = Scalar::from(5);
+        let b = Scalar::from(9);
+
+        // compute u-ary decomposition for m-a and m-b+u^l
+        // should panic because the private attribute is not in the given range
+        let _m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
+        let _m_b: [Scalar; L] =
+            compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
     }
 }
