@@ -30,9 +30,7 @@ use sha2::Sha256;
 use crate::elgamal::Ciphertext;
 use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
-use crate::scheme::verification_range_proof::{
-    compute_u_ary_decomposition, pick_range_signatures, L, U,
-};
+use crate::scheme::verification_range_proof::{L, U};
 use crate::scheme::VerificationKey;
 use crate::utils::{
     hash_g1, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
@@ -1277,7 +1275,9 @@ mod tests {
     use crate::scheme::keygen::{keygen, single_attribute_keygen};
     use crate::scheme::setup::setup;
     use crate::scheme::verification::compute_kappa;
-    use crate::scheme::verification_range_proof::issue_range_signatures;
+    use crate::scheme::verification_range_proof::{
+        compute_u_ary_decomposition, issue_range_signatures, pick_range_signatures,
+    };
     use crate::scheme::verification_set_membership::issue_membership_signatures;
 
     use crate::utils::RawAttribute;

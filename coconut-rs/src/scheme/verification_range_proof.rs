@@ -505,7 +505,7 @@ pub fn verify_range_credential(
 
 #[cfg(test)]
 mod tests {
-    use crate::scheme::keygen::{keygen, single_attribute_keygen};
+    use crate::scheme::keygen::keygen;
     use crate::scheme::setup::setup;
 
     use super::*;
