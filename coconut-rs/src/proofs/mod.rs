@@ -36,7 +36,6 @@ use crate::scheme::verification_range_proof::{
 use crate::scheme::VerificationKey;
 use crate::utils::{
     hash_g1, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
-    RawAttribute,
 };
 use crate::{elgamal, Attribute, ElGamalKeyPair};
 
@@ -1071,7 +1070,9 @@ impl RangeProof {
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let total_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
             + 4 * L * SCALAR_SIZE
+            + USIZE_SIZE
             + self.s_m.len() * SCALAR_SIZE
+            + SCALAR_SIZE
             + SCALAR_SIZE
             + SCALAR_SIZE;
 
@@ -1112,13 +1113,15 @@ impl RangeProof {
         bytes.extend_from_slice(&self.s_r1.to_bytes());
         bytes.extend_from_slice(&self.s_r2.to_bytes());
 
+        bytes.extend_from_slice(&self.challenge.to_bytes());
+
         bytes
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let min_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
             + 4 * L * SCALAR_SIZE
-            + SCALAR_SIZE
+            + USIZE_SIZE
             + SCALAR_SIZE
             + SCALAR_SIZE
             + SCALAR_SIZE;
@@ -1845,5 +1848,122 @@ mod tests {
         let _m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
         let _m_b: [Scalar; L] =
             compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
+    }
+
+    #[test]
+    fn range_proof_bytes_roundtrip_1() {
+        let params = setup(1).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(1);
+
+        let a = params.random_scalar();
+        let b = params.random_scalar();
+
+        let m_a = params.n_random_scalars(L).try_into().unwrap();
+        let m_b = params.n_random_scalars(L).try_into().unwrap();
+
+        let r_a = params.n_random_scalars(L).try_into().unwrap();
+        let r_b = params.n_random_scalars(L).try_into().unwrap();
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = RangeProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            a,
+            b,
+            &m_a,
+            &m_b,
+            &r_a,
+            &r_b,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(RangeProof::from_bytes(&bytes).unwrap(), pi);
+    }
+
+    #[test]
+    fn range_proof_bytes_roundtrip_10() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(10);
+
+        let a = params.random_scalar();
+        let b = params.random_scalar();
+
+        let m_a = params.n_random_scalars(L).try_into().unwrap();
+        let m_b = params.n_random_scalars(L).try_into().unwrap();
+
+        let r_a = params.n_random_scalars(L).try_into().unwrap();
+        let r_b = params.n_random_scalars(L).try_into().unwrap();
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = RangeProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            a,
+            b,
+            &m_a,
+            &m_b,
+            &r_a,
+            &r_b,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(RangeProof::from_bytes(&bytes).unwrap(), pi);
+    }
+
+    #[test]
+    fn range_proof_bytes_roundtrip_5_5() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(5);
+
+        let a = params.random_scalar();
+        let b = params.random_scalar();
+
+        let m_a = params.n_random_scalars(L).try_into().unwrap();
+        let m_b = params.n_random_scalars(L).try_into().unwrap();
+
+        let r_a = params.n_random_scalars(L).try_into().unwrap();
+        let r_b = params.n_random_scalars(L).try_into().unwrap();
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = RangeProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            a,
+            b,
+            &m_a,
+            &m_b,
+            &r_a,
+            &r_b,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(RangeProof::from_bytes(&bytes).unwrap(), pi);
     }
 }
