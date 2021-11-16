@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
@@ -23,7 +21,6 @@ use std::mem::size_of;
 
 use crate::error::{CoconutError, Result};
 use crate::proofs::RangeProof;
-use crate::scheme::keygen::single_attribute_keygen;
 use crate::scheme::setup::Parameters;
 use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
 use crate::scheme::verification_set_membership::{issue_membership_signatures, SpSignatures};
@@ -41,7 +38,6 @@ pub const U: usize = 4;
 pub const L: usize = 8;
 
 const G2PCOMPRESSED_SIZE: usize = 96;
-const USIZE_SIZE: usize = size_of::<usize>();
 const SCALAR_SIZE: usize = size_of::<Scalar>();
 const SIGNATURE_SIZE: usize = 96;
 
@@ -65,12 +61,6 @@ impl TryFrom<&[u8]> for RangeTheta {
     type Error = CoconutError;
 
     fn try_from(bytes: &[u8]) -> Result<RangeTheta> {
-        let min_size = 2 * SCALAR_SIZE
-            + 2 * L * G2PCOMPRESSED_SIZE
-            + 2 * L * SIGNATURE_SIZE
-            + G2PCOMPRESSED_SIZE
-            + SIGNATURE_SIZE;
-
         let mut p = 0;
 
         let a_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
