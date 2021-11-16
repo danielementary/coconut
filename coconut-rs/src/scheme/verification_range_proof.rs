@@ -367,6 +367,14 @@ pub fn prove_credential_and_range(
                 )));
     }
 
+    if !scalar_smaller_than_2_16(a)
+        || !scalar_smaller_than_2_16(b)
+        || scalar_to_u64(b) < scalar_to_u64(a)
+    {
+        return Err(CoconutError::Verification(
+                "Tried to prove a credential with inadequate bounds, make sure a and b are in the correct range and that b is greater or equal to a.".to_string()));
+    }
+
     // use first private attribute for range proof
     let m = private_attributes[0];
     // compute decompositon for m - a and m - b + U^L
