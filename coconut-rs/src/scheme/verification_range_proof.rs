@@ -117,16 +117,16 @@ impl TryFrom<&[u8]> for RangeTheta {
             p += G2PCOMPRESSED_SIZE;
         }
 
-        let kappa_a_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
-        p += SCALAR_SIZE;
+        let kappa_a_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+        p += G2PCOMPRESSED_SIZE;
 
         let kappa_a = try_deserialize_g2_projective(
             &kappa_a_bytes,
             CoconutError::Deserialization("failed to deserialize kappa_a".to_string()),
         )?;
 
-        let kappa_b_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
-        p += SCALAR_SIZE;
+        let kappa_b_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
+        p += G2PCOMPRESSED_SIZE;
 
         let kappa_b = try_deserialize_g2_projective(
             &kappa_b_bytes,
@@ -293,7 +293,6 @@ fn scalar_smaller_than_2_16(number: Scalar) -> bool {
     true
 }
 
-// not the most elegant way of casting a scalar into a single u64
 fn scalar_to_u64(number: Scalar) -> u64 {
     let mut u64_bytes: [u8; 8] = [0; 8];
     let number_bytes = number.to_bytes();
@@ -506,6 +505,9 @@ pub fn verify_range_credential(
 
 #[cfg(test)]
 mod tests {
+    use crate::scheme::keygen::{keygen, single_attribute_keygen};
+    use crate::scheme::setup::setup;
+
     use super::*;
 
     #[test]
@@ -608,5 +610,121 @@ mod tests {
         for v in values {
             assert_eq!(v as u64, scalar_to_u64(Scalar::from(v)));
         }
+    }
+
+    #[test]
+    fn issue_range_signatures_len() {
+        let params = setup(1).unwrap();
+        let range_signatures = issue_range_signatures(&params);
+
+        assert_eq!(U, range_signatures.signatures.len());
+    }
+
+    #[test]
+    fn range_theta_bytes_roundtrip_1() {
+        let params = setup(1).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let private_attributes = [Scalar::from(10)];
+
+        let signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let all_range_signatures = issue_range_signatures(&params);
+        let sp_verification_key = &all_range_signatures.sp_verification_key;
+
+        let a = Scalar::from(0);
+        let b = Scalar::from(15);
+
+        let theta = prove_credential_and_range(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &signature,
+            &all_range_signatures,
+            a,
+            b,
+            &private_attributes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            RangeTheta::try_from(theta.to_bytes().as_slice()).unwrap(),
+            theta
+        );
+    }
+
+    #[test]
+    fn range_theta_bytes_roundtrip_10() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let private_attributes = [[Scalar::from(10)].to_vec(), params.n_random_scalars(9)].concat();
+
+        let signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let all_range_signatures = issue_range_signatures(&params);
+        let sp_verification_key = &all_range_signatures.sp_verification_key;
+
+        let a = Scalar::from(0);
+        let b = Scalar::from(15);
+
+        let theta = prove_credential_and_range(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &signature,
+            &all_range_signatures,
+            a,
+            b,
+            &private_attributes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            RangeTheta::try_from(theta.to_bytes().as_slice()).unwrap(),
+            theta
+        );
+    }
+
+    #[test]
+    fn range_theta_bytes_roundtrip_5_5() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let private_attributes = [[Scalar::from(10)].to_vec(), params.n_random_scalars(4)].concat();
+
+        let signature = Signature(
+            params.gen1() * params.random_scalar(),
+            params.gen1() * params.random_scalar(),
+        );
+
+        let all_range_signatures = issue_range_signatures(&params);
+        let sp_verification_key = &all_range_signatures.sp_verification_key;
+
+        let a = Scalar::from(0);
+        let b = Scalar::from(15);
+
+        let theta = prove_credential_and_range(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &signature,
+            &all_range_signatures,
+            a,
+            b,
+            &private_attributes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            RangeTheta::try_from(theta.to_bytes().as_slice()).unwrap(),
+            theta
+        );
     }
 }
