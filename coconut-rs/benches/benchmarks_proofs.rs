@@ -61,14 +61,12 @@ pub fn bench_proofs_functions(c: &mut Criterion) {
     }
     group.finish();
 
-    // TODO: add roundtrips for SMP, RP, SMT and RT
-    //
     // prepare roundtrips benchmarks with dummy values
     let params = setup(10).unwrap();
 
     let verification_key = keygen(&params).verification_key();
     let sp_verification_key = single_attribute_keygen(&params).verification_key();
-    let private_attributes = params.n_random_scalars(5);
+    let private_attributes = [[Scalar::from(10)].to_vec(), params.n_random_scalars(4)].concat();
 
     let signature = range_signatures
         .signatures

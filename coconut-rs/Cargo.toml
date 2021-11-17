@@ -44,6 +44,10 @@ harness = false
 name = "benchmarks_proofs"
 harness = false
 
+[[bench]]
+name = "benchmarks_e2e"
+harness = false
+
 [features]
 default = []
 
