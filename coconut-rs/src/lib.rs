@@ -54,6 +54,7 @@ pub use scheme::Signature;
 pub use scheme::SignatureShare;
 pub use traits::Base58;
 pub use utils::hash_to_scalar;
+pub use utils::RawAttribute;
 
 pub type Attribute = Scalar;
 

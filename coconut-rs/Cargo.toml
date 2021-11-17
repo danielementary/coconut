@@ -40,6 +40,10 @@ version = "1"
 name = "benchmarks"
 harness = false
 
+[[bench]]
+name = "benchmarks_proofs"
+harness = false
+
 [features]
 default = []
 
