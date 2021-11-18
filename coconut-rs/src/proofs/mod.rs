@@ -779,24 +779,28 @@ impl SetMembershipProof {
     }
 }
 
+// TODO: reprendre here
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct RangeProof {
     base_u: usize,
     number_of_base_elements_l: usize,
-    a: Scalar, // lower bound
-    b: Scalar, // upper bound
-    kappas_a_prime: Vec<G2Projective>,
-    kappas_b_prime: Vec<G2Projective>,
-    kappa_a_prime: G2Projective,
-    kappa_b_prime: G2Projective,
-    s_m_a: Vec<Scalar>,
-    s_m_b: Vec<Scalar>,
-    s_r_a: Vec<Scalar>,
-    s_r_b: Vec<Scalar>,
-    s_m: Vec<Scalar>,
-    s_r1: Scalar,
-    s_r2: Scalar,
+    lower_bound: Scalar,
+    upper_bound: Scalar,
+    // lower bound
+    commitment_credential_blinder_lower_bound: G2Projective,
+    commitments_decomposition_lower_bound: Vec<G2Projective>,
+    responses_decomposition_lower_bound: Vec<Scalar>,
+    responses_decomposition_blinders_lower_bound: Vec<Scalar>,
+    // upper bound
+    commitment_credential_blinder_upper_bound: G2Projective,
+    commitments_decomposition_upper_bound: Vec<G2Projective>,
+    responses_decomposition_upper_bound: Vec<Scalar>,
+    responses_decomposition_upper_lower_bound: Vec<Scalar>,
+    // private attribute responses
+    responses_private_attributes: Vec<Scalar>,
+    responses_credential_blinder_lower_bound: Scalar,
+    responses_credential_blinder_upper_bound: Scalar,
 }
 
 impl RangeProof {
