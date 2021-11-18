@@ -250,37 +250,6 @@ pub(crate) fn try_deserialize_g2_projective(
         .map(G2Projective::from)
 }
 
-pub(crate) fn try_deserialize_g2_projective_vec(
-    expected_len: u64,
-    bytes: &[u8],
-    err: CoconutError,
-) -> Result<Vec<G2Projective>> {
-    if bytes.len() != expected_len as usize * G2PCOMPRESSED_SIZE {
-        return Err(err);
-    }
-
-    let mut out = Vec::with_capacity(expected_len as usize);
-    for i in 0..expected_len as usize {
-        let s_bytes = bytes[i * G2PCOMPRESSED_SIZE..(i + 1) * G2PCOMPRESSED_SIZE]
-            .try_into()
-            .unwrap();
-        let s = try_deserialize_g2_projective(
-            s_bytes,
-            CoconutError::Deserialization(
-                format!(
-                    "failed to deserialize the {}-th element of this G2Projective vec",
-                    i
-                )
-                .to_string(),
-            ),
-        )
-        .unwrap();
-        out.push(s);
-    }
-
-    Ok(out)
-}
-
 // use core::fmt;
 // #[cfg(feature = "serde")]
 // use serde::de::Visitor;

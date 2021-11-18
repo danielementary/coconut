@@ -60,11 +60,11 @@ pub struct RangeTheta {
     nizkp: RangeProof,
 }
 
-fn serialize_usize(u: &usize, bytes: &Vec<u8>) {
+fn serialize_usize(u: &usize, bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&u.to_be_bytes());
 }
 
-fn deserialize_usize(bytes: &[u8], pointer: &usize) -> usize {
+fn deserialize_usize(bytes: &[u8], pointer: &mut usize) -> usize {
     let pointer_end = *pointer + USIZE_SIZE;
     let u = usize::from_be_bytes(bytes[*pointer..pointer_end].try_into().unwrap());
     *pointer = pointer_end;
@@ -72,11 +72,11 @@ fn deserialize_usize(bytes: &[u8], pointer: &usize) -> usize {
     u
 }
 
-fn serialize_scalar(s: &Scalar, bytes: &Vec<u8>) {
+fn serialize_scalar(s: &Scalar, bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&s.to_bytes());
 }
 
-fn deserialize_scalar(bytes: &[u8], pointer: &usize) -> Scalar {
+fn deserialize_scalar(bytes: &[u8], pointer: &mut usize) -> Scalar {
     let pointer_end = *pointer + SCALAR_SIZE;
     let s = Scalar::from_bytes(&bytes[*pointer..pointer_end].try_into().unwrap()).unwrap();
     *pointer = pointer_end;
@@ -84,11 +84,11 @@ fn deserialize_scalar(bytes: &[u8], pointer: &usize) -> Scalar {
     s
 }
 
-fn serialize_signature(s: &Signature, bytes: &Vec<u8>) {
+fn serialize_signature(s: &Signature, bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&s.to_bytes());
 }
 
-fn deserialize_signature(bytes: &[u8], pointer: &usize) -> Signature {
+fn deserialize_signature(bytes: &[u8], pointer: &mut usize) -> Signature {
     let pointer_end = *pointer + SIGNATURE_SIZE;
     let s = Signature::try_from(&bytes[*pointer..pointer_end]).unwrap();
     *pointer = pointer_end;
@@ -96,25 +96,25 @@ fn deserialize_signature(bytes: &[u8], pointer: &usize) -> Signature {
     s
 }
 
-fn serialize_signatures(s: &Vec<Signature>, bytes: &Vec<u8>) {
-    s.iter().for_each(|s| serialize_signature(&s, &bytes));
+fn serialize_signatures(s: &Vec<Signature>, bytes: &mut Vec<u8>) {
+    s.iter().for_each(|s| serialize_signature(&s, bytes));
 }
 
 fn deserialize_signatures(
     bytes: &[u8],
-    pointer: &usize,
+    pointer: &mut usize,
     number_of_signatures: usize,
 ) -> Vec<Signature> {
     (0..number_of_signatures)
-        .map(|i| deserialize_signature(&bytes, pointer))
+        .map(|_| deserialize_signature(&bytes, pointer))
         .collect()
 }
 
-fn serialize_g2_projective(g: &G2Projective, bytes: &Vec<u8>) {
+fn serialize_g2_projective(g: &G2Projective, bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&g.to_affine().to_compressed());
 }
 
-fn deserialize_g2_projective(bytes: &[u8], pointer: &usize) -> G2Projective {
+fn deserialize_g2_projective(bytes: &[u8], pointer: &mut usize) -> G2Projective {
     let pointer_end = *pointer + G2PCOMPRESSED_SIZE;
     let g = G2Projective::from(
         G2Affine::from_compressed(bytes[*pointer..pointer_end].try_into().unwrap()).unwrap(),
@@ -124,25 +124,25 @@ fn deserialize_g2_projective(bytes: &[u8], pointer: &usize) -> G2Projective {
     g
 }
 
-fn serialize_g2_projectives(g: &Vec<G2Projective>, bytes: &Vec<u8>) {
-    g.iter().for_each(|g| serialize_g2_projective(&g, &bytes));
+fn serialize_g2_projectives(g: &Vec<G2Projective>, bytes: &mut Vec<u8>) {
+    g.iter().for_each(|g| serialize_g2_projective(&g, bytes));
 }
 
 fn deserialize_g2_projectives(
     bytes: &[u8],
-    pointer: &usize,
+    pointer: &mut usize,
     number_of_g2_projectives: usize,
 ) -> Vec<G2Projective> {
     (0..number_of_g2_projectives)
-        .map(|i| deserialize_g2_projective(&bytes, pointer))
+        .map(|_| deserialize_g2_projective(&bytes, pointer))
         .collect()
 }
 
-fn serialize_proof(p: &RangeProof, bytes: &Vec<u8>) {
+fn serialize_proof(p: &RangeProof, bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&p.to_bytes());
 }
 
-fn deserialize_range_proof(bytes: &[u8], pointer: &usize) -> RangeProof {
+fn deserialize_range_proof(bytes: &[u8], pointer: &mut usize) -> RangeProof {
     RangeProof::from_bytes(&bytes[*pointer..]).unwrap()
 }
 
@@ -152,27 +152,27 @@ impl TryFrom<&[u8]> for RangeTheta {
     fn try_from(bytes: &[u8]) -> Result<RangeTheta> {
         let mut pointer = 0;
 
-        let base_u = deserialize_usize(&bytes, &pointer);
-        let number_of_base_elements_l = deserialize_usize(&bytes, &pointer);
+        let base_u = deserialize_usize(&bytes, &mut pointer);
+        let number_of_base_elements_l = deserialize_usize(&bytes, &mut pointer);
 
-        let lower_bound = deserialize_scalar(&bytes, &pointer);
-        let upper_bound = deserialize_scalar(&bytes, &pointer);
+        let lower_bound = deserialize_scalar(&bytes, &mut pointer);
+        let upper_bound = deserialize_scalar(&bytes, &mut pointer);
 
         let decomposition_randomized_signatures_lower_bound =
-            deserialize_signatures(&bytes, &pointer, number_of_base_elements_l);
+            deserialize_signatures(&bytes, &mut pointer, number_of_base_elements_l);
         let decomposition_kappas_lower_bound =
-            deserialize_g2_projectives(&bytes, &pointer, number_of_base_elements_l);
-        let randomized_credential_lower_bound = deserialize_signature(&bytes, &pointer);
-        let credential_kappa_lower_bound = deserialize_g2_projective(&bytes, &pointer);
+            deserialize_g2_projectives(&bytes, &mut pointer, number_of_base_elements_l);
+        let randomized_credential_lower_bound = deserialize_signature(&bytes, &mut pointer);
+        let credential_kappa_lower_bound = deserialize_g2_projective(&bytes, &mut pointer);
 
         let decomposition_randomized_signatures_upper_bound =
-            deserialize_signatures(&bytes, &pointer, number_of_base_elements_l);
+            deserialize_signatures(&bytes, &mut pointer, number_of_base_elements_l);
         let decomposition_kappas_upper_bound =
-            deserialize_g2_projectives(&bytes, &pointer, number_of_base_elements_l);
-        let randomized_credential_upper_bound = deserialize_signature(&bytes, &pointer);
-        let credential_kappa_upper_bound = deserialize_g2_projective(&bytes, &pointer);
+            deserialize_g2_projectives(&bytes, &mut pointer, number_of_base_elements_l);
+        let randomized_credential_upper_bound = deserialize_signature(&bytes, &mut pointer);
+        let credential_kappa_upper_bound = deserialize_g2_projective(&bytes, &mut pointer);
 
-        let nizkp = deserialize_range_proof(&bytes, &pointer);
+        let nizkp = deserialize_range_proof(&bytes, &mut pointer);
 
         Ok(RangeTheta {
             base_u,
@@ -199,7 +199,7 @@ impl RangeTheta {
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
     ) -> bool {
-        self.pi.verify(
+        self.nizkp.verify(
             &params,
             &verification_key,
             &sp_verification_key,
@@ -213,29 +213,29 @@ impl RangeTheta {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
 
-        serialize_usize(&self.base_u, &bytes);
-        serialize_usize(&self.number_of_base_elements_l, &bytes);
+        serialize_usize(&self.base_u, &mut bytes);
+        serialize_usize(&self.number_of_base_elements_l, &mut bytes);
 
-        serialize_scalar(&self.lower_bound, &bytes);
-        serialize_scalar(&self.upper_bound, &bytes);
+        serialize_scalar(&self.lower_bound, &mut bytes);
+        serialize_scalar(&self.upper_bound, &mut bytes);
 
         serialize_signatures(
             &self.decomposition_randomized_signatures_lower_bound,
-            &bytes,
+            &mut bytes,
         );
-        serialize_g2_projectives(&self.decomposition_kappas_lower_bound, &bytes);
-        serialize_signature(&self.randomized_credential_lower_bound, &bytes);
-        serialize_g2_projective(&self.credential_kappa_lower_bound, &bytes);
+        serialize_g2_projectives(&self.decomposition_kappas_lower_bound, &mut bytes);
+        serialize_signature(&self.randomized_credential_lower_bound, &mut bytes);
+        serialize_g2_projective(&self.credential_kappa_lower_bound, &mut bytes);
 
         serialize_signatures(
             &self.decomposition_randomized_signatures_upper_bound,
-            &bytes,
+            &mut bytes,
         );
-        serialize_g2_projectives(&self.decomposition_kappas_upper_bound, &bytes);
-        serialize_signature(&self.randomized_credential_upper_bound, &bytes);
-        serialize_g2_projective(&self.credential_kappa_upper_bound, &bytes);
+        serialize_g2_projectives(&self.decomposition_kappas_upper_bound, &mut bytes);
+        serialize_signature(&self.randomized_credential_upper_bound, &mut bytes);
+        serialize_g2_projective(&self.credential_kappa_upper_bound, &mut bytes);
 
-        serialize_proof(&self.nizkp, &bytes);
+        serialize_proof(&self.nizkp, &mut bytes);
 
         bytes
     }
@@ -260,7 +260,6 @@ impl Base58 for RangeTheta {}
 pub fn issue_range_signatures(params: &Parameters) -> SpSignatures {
     // TODO: remove U and L
     const U: usize = 4;
-    const L: usize = 8;
 
     let set: Vec<usize> = (0..U).collect();
     let set: Vec<RawAttribute> = set
@@ -271,7 +270,7 @@ pub fn issue_range_signatures(params: &Parameters) -> SpSignatures {
     issue_membership_signatures(params, &set[..])
 }
 
-fn scalar_fits_in_u64(number: Scalar) -> bool {
+fn scalar_fits_in_u64(number: &Scalar) -> bool {
     let bytes = number.to_bytes();
 
     // check that only first 64 bits are set
@@ -284,8 +283,8 @@ fn scalar_fits_in_u64(number: Scalar) -> bool {
     true
 }
 
-fn scalar_to_u64(number: Scalar) -> u64 {
-    if !scalar_fits_in_u64(number) {
+fn scalar_to_u64(number: &Scalar) -> u64 {
+    if !scalar_fits_in_u64(&number) {
         panic!("This scalar does not fit in u64");
     }
 
@@ -299,7 +298,7 @@ fn scalar_to_u64(number: Scalar) -> u64 {
 }
 
 pub fn compute_u_ary_decomposition(
-    number: Scalar,
+    number: &Scalar,
     base_u: usize,
     number_of_base_elements_l: usize,
 ) -> Vec<Scalar> {
@@ -307,7 +306,7 @@ pub fn compute_u_ary_decomposition(
     // may panic if number does not fit in u64
     // or if number_of_base_elements_l doest not fit in u32
     // but this should usually not happen
-    let number = scalar_to_u64(number);
+    let number = scalar_to_u64(&number);
     let base_u = u64::try_from(base_u).unwrap();
     let number_of_base_elements_l = u32::try_from(number_of_base_elements_l).unwrap();
 
@@ -337,39 +336,41 @@ pub fn compute_u_ary_decomposition(
     decomposition
 }
 
-fn pick_signature_for_decomposition_base_element(
+fn pick_signature_for_base_element(
     m: &Scalar,
     signatures: &HashMap<RawAttribute, Signature>,
 ) -> Signature {
     signatures
-        .get(&RawAttribute::Number(scalar_to_u64(*m)))
+        .get(&RawAttribute::Number(scalar_to_u64(m)))
         .unwrap()
         .clone()
 }
 
-pub fn pick_signatures_for_decomposition_base_elements(
+pub fn pick_signatures_for_decomposition(
     decomposition: &Vec<Scalar>,
     signatures: &HashMap<RawAttribute, Signature>,
 ) -> Vec<Signature> {
     decomposition
         .iter()
-        .map(|base_elements_i| {
-            pick_signature_for_decomposition_base_element(base_elements_i, signatures)
-        })
+        .map(|base_elements_i| pick_signature_for_base_element(base_elements_i, signatures))
         .collect()
 }
 
 pub fn prove_credential_and_range(
+    // parameters
     params: &Parameters,
     base_u: usize,
     number_of_base_elements_l: usize,
-    a: Scalar, // lower bound
-    b: Scalar, // upper bound
+    lower_bound: &Scalar,
+    upper_bound: &Scalar,
+    // keys
     verification_key: &VerificationKey,
     sp_verification_key: &VerificationKey,
-    signature: &Signature,
-    all_range_signatures: &SpSignatures,
-    private_attributes: &[Attribute],
+    // signatures
+    credential: &Signature,
+    sp_signatures: &HashMap<RawAttribute, Signature>,
+    // attributes
+    private_attributes: &Vec<Attribute>,
 ) -> Result<RangeTheta> {
     if private_attributes.is_empty() {
         return Err(CoconutError::Verification(
@@ -379,86 +380,121 @@ pub fn prove_credential_and_range(
 
     if private_attributes.len() > verification_key.beta.len() {
         return Err(
-            CoconutError::Verification(
-                format!("Tried to prove a credential for higher than supported by the provided verification key number of attributes (max: {}, requested: {})",
-                        verification_key.beta.len(),
-                        private_attributes.len()
-                )));
+            CoconutError::Verification("Tried to prove a credential for higher than supported by the provided verification key number of attributes.".to_string()));
     }
 
-    if scalar_to_u64(b) < scalar_to_u64(a) {
+    if scalar_to_u64(upper_bound) < scalar_to_u64(lower_bound) {
         return Err(CoconutError::Verification(
-                "Tried to prove a credential with inadequate bounds, make sure a and b are in the correct range and that b is greater or equal to a.".to_string()));
+                "Tried to prove a credential with inadequate bounds, make sure that upper_bound >= lower_bound.".to_string()));
     }
 
     // use first private attribute for range proof
-    let m = private_attributes[0];
+    let private_attribute_for_proof = private_attributes[0];
 
-    // compute decompositon for m - a and m - b + U^L
-    let m_a = compute_u_ary_decomposition(m - a, base_u, number_of_base_elements_l);
-    let m_b = compute_u_ary_decomposition(
-        m - b + Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32)),
+    // lower bound run
+    let decomposition_lower_bound = compute_u_ary_decomposition(
+        &(private_attribute_for_proof - lower_bound),
         base_u,
         number_of_base_elements_l,
     );
-
-    let a_a =
-        pick_signatures_for_decomposition_base_elements(&m_a, &all_range_signatures.signatures);
-    let a_b =
-        pick_signatures_for_decomposition_base_elements(&m_b, &all_range_signatures.signatures);
-
-    let (a_prime_a, r_a): (Vec<_>, Vec<_>) = a_a.iter().map(|a| a.randomise(&params)).unzip();
-    let (a_prime_b, r_b): (Vec<_>, Vec<_>) = a_b.iter().map(|a| a.randomise(&params)).unzip();
-
-    let (sigma_prime_a, r1) = signature.randomise(&params);
-    let (sigma_prime_b, r2) = signature.randomise(&params);
-
-    let kappas_a: Vec<_> = r_a
+    let decomposition_signatures_lower_bound =
+        pick_signatures_for_decomposition(&decomposition_lower_bound, &sp_signatures);
+    let (decomposition_randomized_signatures_lower_bound, decomposition_blinders_lower_bound): (
+        Vec<_>,
+        Vec<_>,
+    ) = decomposition_signatures_lower_bound
+        .iter()
+        .map(|s| s.randomise(&params))
+        .unzip();
+    let (randomized_credential_lower_bound, credential_blinder_lower_bound) =
+        credential.randomise(&params);
+    let decomposition_kappas_lower_bound = decomposition_blinders_lower_bound
         .iter()
         .enumerate()
-        .map(|(i, r)| compute_kappa(params, sp_verification_key, &m_a[i..], *r))
+        .map(|(i, b)| {
+            compute_kappa(
+                params,
+                sp_verification_key,
+                &decomposition_lower_bound[i..],
+                *b,
+            )
+        })
         .collect();
-    let kappas_a = kappas_a.try_into().unwrap();
+    let credential_kappa_lower_bound = compute_kappa(
+        params,
+        verification_key,
+        private_attributes,
+        credential_blinder_lower_bound,
+    );
 
-    let kappas_b: Vec<_> = r_b
+    // upper bound run
+    let decomposition_upper_bound = compute_u_ary_decomposition(
+        &(private_attribute_for_proof - upper_bound
+            + Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32))),
+        base_u,
+        number_of_base_elements_l,
+    );
+    let decomposition_signatures_upper_bound =
+        pick_signatures_for_decomposition(&decomposition_upper_bound, &sp_signatures);
+    let (decomposition_randomized_signatures_upper_bound, decomposition_blinders_upper_bound): (
+        Vec<_>,
+        Vec<_>,
+    ) = decomposition_signatures_upper_bound
+        .iter()
+        .map(|s| s.randomise(&params))
+        .unzip();
+    let (randomized_credential_upper_bound, credential_blinder_upper_bound) =
+        credential.randomise(&params);
+    let decomposition_kappas_upper_bound = decomposition_blinders_upper_bound
         .iter()
         .enumerate()
-        .map(|(i, r)| compute_kappa(params, sp_verification_key, &m_b[i..], *r))
+        .map(|(i, b)| {
+            compute_kappa(
+                params,
+                sp_verification_key,
+                &decomposition_upper_bound[i..],
+                *b,
+            )
+        })
         .collect();
-    let kappas_b = kappas_b.try_into().unwrap();
+    let credential_kappa_upper_bound = compute_kappa(
+        params,
+        verification_key,
+        private_attributes,
+        credential_blinder_upper_bound,
+    );
 
-    let kappa_a = compute_kappa(params, verification_key, private_attributes, r1);
-    let kappa_b = compute_kappa(params, verification_key, private_attributes, r2);
-
-    let pi = RangeProof::construct(
+    let nizkp = RangeProof::construct(
         params,
         verification_key,
         sp_verification_key,
         private_attributes,
         base_u,
         number_of_base_elements_l,
-        a,
-        b,
-        &m_a,
-        &m_b,
-        &r_a,
-        &r_b,
-        &r1,
-        &r2,
+        lower_bound, // lower bound
+        upper_bound, // upper bound
+        &decomposition_lower_bound,
+        &decomposition_upper_bound,
+        &decomposition_blinders_lower_bound,
+        &decomposition_blinders_upper_bound,
+        &credential_blinder_lower_bound,
+        &credential_blinder_upper_bound,
     );
 
     Ok(RangeTheta {
-        a,
-        b,
-        kappas_a,
-        kappas_b,
-        a_prime_a,
-        a_prime_b,
-        kappa_a,
-        kappa_b,
-        sigma_prime_a,
-        sigma_prime_b,
-        pi,
+        base_u,
+        number_of_base_elements_l,
+        lower_bound: *lower_bound,
+        upper_bound: *upper_bound,
+        decomposition_randomized_signatures_lower_bound,
+        decomposition_kappas_lower_bound,
+        randomized_credential_lower_bound,
+        credential_kappa_lower_bound,
+        decomposition_randomized_signatures_upper_bound,
+        decomposition_kappas_upper_bound,
+        randomized_credential_upper_bound,
+        credential_kappa_upper_bound,
+        nizkp,
     })
 }
 
@@ -469,7 +505,7 @@ pub fn verify_range_credential(
     theta: &RangeTheta,
     public_attributes: &[Attribute],
 ) -> bool {
-    if public_attributes.len() + theta.pi.private_attributes() > verification_key.beta.len() {
+    if public_attributes.len() + theta.nizkp.private_attributes() > verification_key.beta.len() {
         return false;
     }
 
@@ -477,25 +513,29 @@ pub fn verify_range_credential(
         return false;
     }
 
-    for a in &theta.a_prime_a {
+    for a in &theta.decomposition_randomized_signatures_lower_bound {
         if bool::from(a.0.is_identity()) {
             return false;
         }
     }
 
-    for a in &theta.a_prime_b {
+    for a in &theta.decomposition_randomized_signatures_upper_bound {
         if bool::from(a.0.is_identity()) {
             return false;
         }
     }
 
-    if bool::from(theta.sigma_prime_a.0.is_identity())
-        || bool::from(theta.sigma_prime_b.0.is_identity())
+    if bool::from(theta.randomized_credential_lower_bound.0.is_identity())
+        || bool::from(theta.randomized_credential_upper_bound.0.is_identity())
     {
         return false;
     }
 
-    for (a, k) in theta.a_prime_a.iter().zip(&theta.kappas_a) {
+    for (a, k) in theta
+        .decomposition_randomized_signatures_lower_bound
+        .iter()
+        .zip(&theta.decomposition_kappas_lower_bound)
+    {
         if !check_bilinear_pairing(
             &a.0.to_affine(),
             &G2Prepared::from(k.to_affine()),
@@ -506,7 +546,11 @@ pub fn verify_range_credential(
         }
     }
 
-    for (a, k) in theta.a_prime_b.iter().zip(&theta.kappas_b) {
+    for (a, k) in theta
+        .decomposition_randomized_signatures_upper_bound
+        .iter()
+        .zip(&theta.decomposition_kappas_upper_bound)
+    {
         if !check_bilinear_pairing(
             &a.0.to_affine(),
             &G2Prepared::from(k.to_affine()),
@@ -518,14 +562,14 @@ pub fn verify_range_credential(
     }
 
     check_bilinear_pairing(
-        &theta.sigma_prime_a.0.to_affine(),
-        &G2Prepared::from(theta.kappa_a.to_affine()),
-        &(theta.sigma_prime_a.1).to_affine(),
+        &theta.randomized_credential_lower_bound.0.to_affine(),
+        &G2Prepared::from(theta.credential_kappa_lower_bound.to_affine()),
+        &(theta.randomized_credential_lower_bound.1).to_affine(),
         params.prepared_miller_g2(),
     ) && check_bilinear_pairing(
-        &theta.sigma_prime_b.0.to_affine(),
-        &G2Prepared::from(theta.kappa_b.to_affine()),
-        &(theta.sigma_prime_b.1).to_affine(),
+        &theta.randomized_credential_upper_bound.0.to_affine(),
+        &G2Prepared::from(theta.credential_kappa_upper_bound.to_affine()),
+        &(theta.randomized_credential_upper_bound.1).to_affine(),
         params.prepared_miller_g2(),
     )
 }

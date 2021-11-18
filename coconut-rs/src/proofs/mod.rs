@@ -807,8 +807,8 @@ impl RangeProof {
         private_attributes: &[Attribute],
         base_u: usize,
         number_of_base_elements_l: usize,
-        a: Scalar, // lower bound
-        b: Scalar, // upper bound
+        a: &Scalar, // lower bound
+        b: &Scalar, // upper bound
         m_a: &Vec<Scalar>,
         m_b: &Vec<Scalar>,
         r_a: &Vec<Scalar>,
@@ -921,11 +921,10 @@ impl RangeProof {
         let s_r2 = produce_response(&r_r2, &challenge, r2);
 
         RangeProof {
-            challenge,
             base_u,
             number_of_base_elements_l,
-            a,
-            b,
+            a: *a,
+            b: *b,
             kappas_a_prime,
             kappas_b_prime,
             kappa_a_prime,
@@ -950,8 +949,8 @@ impl RangeProof {
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
         kappas_a: &[G2Projective],
-        kappas_b: &[G2Projective],
         kappa_a: &G2Projective,
+        kappas_b: &[G2Projective],
         kappa_b: &G2Projective,
     ) -> bool {
         let kappas_a_prime_bytes = self
@@ -989,9 +988,6 @@ impl RangeProof {
                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
                 .chain(beta_bytes.iter().map(|b| b.as_ref())),
         );
-
-        // to remove after test
-        assert_eq!(challenge, self.challenge);
 
         let kappas_a_lhs = self
             .kappas_a_prime
@@ -1122,14 +1118,11 @@ impl RangeProof {
         bytes.extend_from_slice(&self.s_r1.to_bytes());
         bytes.extend_from_slice(&self.s_r2.to_bytes());
 
-        bytes.extend_from_slice(&self.challenge.to_bytes());
-
         bytes
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // TODO: remove U and L
-        const U: usize = 4;
         const L: usize = 8;
         let base_u = 4;
         let number_of_base_elements_l = 8;
@@ -1249,21 +1242,13 @@ impl RangeProof {
         )?;
 
         let s_r2_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
-        p += SCALAR_SIZE;
 
         let s_r2 = try_deserialize_scalar(
             &s_r2_bytes,
             CoconutError::Deserialization("failed to deserialize the s_r2".to_string()),
         )?;
 
-        let challenge_bytes = bytes[p..].try_into().unwrap();
-        let challenge = try_deserialize_scalar(
-            &challenge_bytes,
-            CoconutError::Deserialization("failed to deserialize the challenge".to_string()),
-        )?;
-
         Ok(RangeProof {
-            challenge,
             base_u,
             number_of_base_elements_l,
             a,

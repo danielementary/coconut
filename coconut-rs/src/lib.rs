@@ -47,7 +47,7 @@ pub use scheme::verification::verify_credential;
 pub use scheme::verification::Theta;
 pub use scheme::verification_range_proof::compute_u_ary_decomposition;
 pub use scheme::verification_range_proof::issue_range_signatures;
-pub use scheme::verification_range_proof::pick_signatures_for_decomposition_base_elements;
+pub use scheme::verification_range_proof::pick_signatures_for_decomposition;
 pub use scheme::verification_range_proof::prove_credential_and_range;
 pub use scheme::verification_range_proof::verify_range_credential;
 pub use scheme::verification_range_proof::RangeTheta;
