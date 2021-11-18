@@ -26,8 +26,7 @@ use crate::proofs::RangeProof;
 use crate::scheme::setup::Parameters;
 use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
 use crate::scheme::verification_set_membership::{issue_membership_signatures, SpSignatures};
-use crate::scheme::Signature;
-use crate::scheme::VerificationKey;
+use crate::scheme::{Signature, VerificationKey};
 
 use crate::traits::{Base58, Bytable};
 
@@ -320,8 +319,8 @@ pub fn compute_u_ary_decomposition(
     let mut decomposition: Vec<Scalar> = Vec::new();
     let mut remainder = number;
 
-    for i in (0..number_of_base_elements_l).rev() {
-        let i_th_pow = base_u.pow(i);
+    for (i, p) in (0..number_of_base_elements_l).rev().enumerate() {
+        let i_th_pow = base_u.pow(p);
         let i_th_base_element = remainder / i_th_pow;
 
         decomposition.push(Scalar::from(i_th_base_element));
@@ -332,7 +331,8 @@ pub fn compute_u_ary_decomposition(
     let number_of_base_elements_l = usize::try_from(number_of_base_elements_l).unwrap();
     assert_eq!(number_of_base_elements_l, decomposition.len());
 
-    // decomposition is big endian: base_u^(number_of_base_elements_l - 1) | ... | base_u^1 | base_u^0
+    // decomposition is little endian: base_u^0 | base_u^1 | ... | base_u^(number_of_base_elements_l - 1)
+    decomposition.reverse();
     decomposition
 }
 
@@ -391,6 +391,7 @@ pub fn prove_credential_and_range(
     // use first private attribute for range proof
     let private_attribute_for_proof = private_attributes[0];
 
+    // TODO: turn this into a function
     // lower bound run
     let decomposition_lower_bound = compute_u_ary_decomposition(
         &(private_attribute_for_proof - lower_bound),
@@ -581,63 +582,96 @@ mod tests {
 
     use super::*;
 
+    // tests are performed for base u and 8 base elements
+    const U: usize = 4;
+    const L: usize = 8;
+    const MAX: u64 = (U as u64).pow(L as u32);
+
+    #[test]
+    fn compute_u_ary_decomposition_scalar_fits_in_u64_tests() {
+        assert!(scalar_fits_in_u64(&Scalar::from(0)));
+        assert!(scalar_fits_in_u64(&Scalar::from(256)));
+        assert!(scalar_fits_in_u64(&Scalar::from(65535)));
+        assert!(scalar_fits_in_u64(&Scalar::from(u64::MAX)));
+
+        assert!(!scalar_fits_in_u64(
+            &(Scalar::from(u64::MAX) + Scalar::from(1))
+        ));
+        assert!(!scalar_fits_in_u64(
+            &(Scalar::from(u64::MAX) * Scalar::from(2))
+        ));
+    }
+
+    #[test]
+    fn compute_u_ary_decomposition_scalar_to_u64_tests() {
+        let values = [0, 1, 2, 3, 254, 255, 256, 65534, 65535, u64::MAX];
+
+        for v in values {
+            assert_eq!(v as u64, scalar_to_u64(&Scalar::from(v)));
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "This scalar does not fit in u64")]
+    fn compute_u_ary_decomposition_scalara_to_u64_overflow_panic() {
+        scalar_to_u64(&(Scalar::from(u64::MAX) + Scalar::from(1)));
+    }
+
     #[test]
     fn compute_u_ary_decomposition_0() {
-        let decomposition = compute_u_ary_decomposition(Scalar::from(0));
+        let decomposition = compute_u_ary_decomposition(&Scalar::from(0), U, L);
 
-        assert_eq!([Scalar::from(0); L], decomposition);
+        assert_eq!([Scalar::from(0); L].to_vec(), decomposition);
     }
 
     #[test]
     fn compute_u_ary_decomposition_1() {
-        let decomposition_1 = compute_u_ary_decomposition(Scalar::from(1));
-        let decomposition_2 = compute_u_ary_decomposition(Scalar::from(2));
-        let decomposition_3 = compute_u_ary_decomposition(Scalar::from(3));
+        let decomposition_1 = compute_u_ary_decomposition(&Scalar::from(1), U, L);
+        let decomposition_2 = compute_u_ary_decomposition(&Scalar::from(2), U, L);
+        let decomposition_3 = compute_u_ary_decomposition(&Scalar::from(3), U, L);
 
         let mut decomposition = [Scalar::from(0); L];
 
         decomposition[0] = Scalar::from(1);
-        assert_eq!(decomposition_1, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_1);
 
         decomposition[0] = Scalar::from(2);
-        assert_eq!(decomposition_2, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_2);
 
         decomposition[0] = Scalar::from(3);
-        assert_eq!(decomposition_3, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_3);
     }
 
     #[test]
     fn compute_u_ary_decomposition_2() {
-        let decomposition_4 = compute_u_ary_decomposition(Scalar::from(4));
-        let decomposition_9 = compute_u_ary_decomposition(Scalar::from(9));
-        let decomposition_14 = compute_u_ary_decomposition(Scalar::from(14));
+        let decomposition_4 = compute_u_ary_decomposition(&Scalar::from(4), U, L);
+        let decomposition_9 = compute_u_ary_decomposition(&Scalar::from(9), U, L);
+        let decomposition_14 = compute_u_ary_decomposition(&Scalar::from(14), U, L);
 
         let mut decomposition = [Scalar::from(0); L];
 
         decomposition[0] = Scalar::from(0);
         decomposition[1] = Scalar::from(1);
-        assert_eq!(decomposition_4, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_4);
 
         decomposition[0] = Scalar::from(1);
         decomposition[1] = Scalar::from(2);
-        assert_eq!(decomposition_9, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_9);
 
         decomposition[0] = Scalar::from(2);
         decomposition[1] = Scalar::from(3);
-        assert_eq!(decomposition_14, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_14);
     }
 
     #[test]
     fn compute_u_ary_decomposition_other() {
-        let max = (U as u64).pow(L as u32) - 1;
-
-        let decomposition_max = compute_u_ary_decomposition(Scalar::from(max));
+        let decomposition_max = compute_u_ary_decomposition(&Scalar::from(MAX - 1), U, L);
 
         let random = 23456;
-        let decomposition_random = compute_u_ary_decomposition(Scalar::from(random));
+        let decomposition_random = compute_u_ary_decomposition(&Scalar::from(random), U, L);
 
         let decomposition = [Scalar::from(3); L];
-        assert_eq!(decomposition_max, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_max);
 
         let decomposition = [
             Scalar::from(0),
@@ -649,38 +683,15 @@ mod tests {
             Scalar::from(1),
             Scalar::from(1),
         ];
-        assert_eq!(decomposition_random, decomposition);
+        assert_eq!(decomposition.to_vec(), decomposition_random);
     }
 
     #[test]
-    #[should_panic(expected = "number must be in range [0, 2^16)")]
+    #[should_panic(
+        expected = "this number is out of range to compute 4-ary decomposition on 8 base elements ([0, 65536))."
+    )]
     fn compute_u_ary_decomposition_overflow_panic() {
-        let max = (U as u64).pow(L as u32);
-
-        compute_u_ary_decomposition(Scalar::from(max));
-    }
-
-    #[test]
-    fn compute_u_ary_decomposition_scalar_smaller_than_2_16_tests() {
-        assert!(scalar_smaller_than_2_16(Scalar::from(0)));
-        assert!(scalar_smaller_than_2_16(Scalar::from(1)));
-        assert!(scalar_smaller_than_2_16(Scalar::from(2)));
-        assert!(scalar_smaller_than_2_16(Scalar::from(256)));
-        assert!(scalar_smaller_than_2_16(Scalar::from(65535)));
-
-        assert!(!scalar_smaller_than_2_16(Scalar::from(65536)));
-        assert!(!scalar_smaller_than_2_16(Scalar::from(65537)));
-        assert!(!scalar_smaller_than_2_16(Scalar::from(65538)));
-        assert!(!scalar_smaller_than_2_16(Scalar::from(u64::MAX)));
-    }
-
-    #[test]
-    fn compute_u_ary_decomposition_scalar_to_u64_tests() {
-        let values = [0, 1, 2, 3, 254, 255, 256, 65534, 65535];
-
-        for v in values {
-            assert_eq!(v as u64, scalar_to_u64(Scalar::from(v)));
-        }
+        compute_u_ary_decomposition(&Scalar::from(MAX), U, L);
     }
 
     #[test]
@@ -696,7 +707,7 @@ mod tests {
         let params = setup(1).unwrap();
 
         let verification_key = keygen(&params).verification_key();
-        let private_attributes = [Scalar::from(10)];
+        let private_attributes = vec![Scalar::from(10)];
 
         let signature = Signature(
             params.gen1() * params.random_scalar(),
@@ -709,14 +720,31 @@ mod tests {
         let a = Scalar::from(0);
         let b = Scalar::from(15);
 
+        // pub fn prove_credential_and_range(
+        //     // parameters
+        //     params: &Parameters,
+        //     base_u: usize,
+        //     number_of_base_elements_l: usize,
+        //     lower_bound: &Scalar,
+        //     upper_bound: &Scalar,
+        //     // keys
+        //     verification_key: &VerificationKey,
+        //     sp_verification_key: &VerificationKey,
+        //     // signatures
+        //     credential: &Signature,
+        //     sp_signatures: &HashMap<RawAttribute, Signature>,
+        //     // attributes
+        //     private_attributes: &Vec<Attribute>,
         let theta = prove_credential_and_range(
             &params,
+            U,
+            L,
+            &a,
+            &b,
             &verification_key,
             &sp_verification_key,
             &signature,
-            &all_range_signatures,
-            a,
-            b,
+            &all_range_signatures.signatures,
             &private_attributes,
         )
         .unwrap();
@@ -732,7 +760,8 @@ mod tests {
         let params = setup(10).unwrap();
 
         let verification_key = keygen(&params).verification_key();
-        let private_attributes = [[Scalar::from(10)].to_vec(), params.n_random_scalars(9)].concat();
+        let private_attributes =
+            vec![[Scalar::from(10)].to_vec(), params.n_random_scalars(9)].concat();
 
         let signature = Signature(
             params.gen1() * params.random_scalar(),
@@ -747,12 +776,14 @@ mod tests {
 
         let theta = prove_credential_and_range(
             &params,
+            U,
+            L,
+            &a,
+            &b,
             &verification_key,
             &sp_verification_key,
             &signature,
-            &all_range_signatures,
-            a,
-            b,
+            &all_range_signatures.signatures,
             &private_attributes,
         )
         .unwrap();
@@ -783,12 +814,14 @@ mod tests {
 
         let theta = prove_credential_and_range(
             &params,
+            U,
+            L,
+            &a,
+            &b,
             &verification_key,
             &sp_verification_key,
             &signature,
-            &all_range_signatures,
-            a,
-            b,
+            &all_range_signatures.signatures,
             &private_attributes,
         )
         .unwrap();
