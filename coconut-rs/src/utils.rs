@@ -15,6 +15,8 @@
 use core::iter::Sum;
 use core::ops::Mul;
 
+use std::mem::size_of;
+
 use std::convert::TryInto;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -26,6 +28,12 @@ use ff::Field;
 use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
 use crate::scheme::SignerIndex;
+
+// default type size for serialization
+pub const G2PCOMPRESSED_SIZE: usize = 96;
+pub const SIGNATURE_SIZE: usize = 96;
+pub const USIZE_SIZE: usize = size_of::<usize>();
+pub const SCALAR_SIZE: usize = size_of::<Scalar>();
 
 //copied from cli-demo to be used as hashable type
 pub type Attribute = Scalar;
@@ -198,6 +206,10 @@ pub fn hash_to_scalar<M: AsRef<[u8]>>(msg: M) -> Scalar {
     output[0]
 }
 
+pub(crate) fn try_deserialize_scalar(bytes: &[u8; 32], err: CoconutError) -> Result<Scalar> {
+    Into::<Option<Scalar>>::into(Scalar::from_bytes(&bytes)).ok_or(err)
+}
+
 pub(crate) fn try_deserialize_scalar_vec(
     expected_len: u64,
     bytes: &[u8],
@@ -220,10 +232,6 @@ pub(crate) fn try_deserialize_scalar_vec(
     Ok(out)
 }
 
-pub(crate) fn try_deserialize_scalar(bytes: &[u8; 32], err: CoconutError) -> Result<Scalar> {
-    Into::<Option<Scalar>>::into(Scalar::from_bytes(&bytes)).ok_or(err)
-}
-
 pub(crate) fn try_deserialize_g1_projective(
     bytes: &[u8; 48],
     err: CoconutError,
@@ -240,6 +248,37 @@ pub(crate) fn try_deserialize_g2_projective(
     Into::<Option<G2Affine>>::into(G2Affine::from_compressed(&bytes))
         .ok_or(err)
         .map(G2Projective::from)
+}
+
+pub(crate) fn try_deserialize_g2_projective_vec(
+    expected_len: u64,
+    bytes: &[u8],
+    err: CoconutError,
+) -> Result<Vec<G2Projective>> {
+    if bytes.len() != expected_len as usize * G2PCOMPRESSED_SIZE {
+        return Err(err);
+    }
+
+    let mut out = Vec::with_capacity(expected_len as usize);
+    for i in 0..expected_len as usize {
+        let s_bytes = bytes[i * G2PCOMPRESSED_SIZE..(i + 1) * G2PCOMPRESSED_SIZE]
+            .try_into()
+            .unwrap();
+        let s = try_deserialize_g2_projective(
+            s_bytes,
+            CoconutError::Deserialization(
+                format!(
+                    "failed to deserialize the {}-th element of this G2Projective vec",
+                    i
+                )
+                .to_string(),
+            ),
+        )
+        .unwrap();
+        out.push(s);
+    }
+
+    Ok(out)
 }
 
 // use core::fmt;

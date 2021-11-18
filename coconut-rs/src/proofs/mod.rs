@@ -20,8 +20,6 @@ use std::convert::TryInto;
 use bls12_381::{G1Projective, G2Projective, Scalar};
 use group::{Curve, GroupEncoding};
 
-use std::mem::size_of;
-
 use digest::generic_array::typenum::Unsigned;
 use digest::Digest;
 use itertools::izip;
@@ -30,19 +28,15 @@ use sha2::Sha256;
 use crate::elgamal::Ciphertext;
 use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
-use crate::scheme::verification_range_proof::{L, U};
 use crate::scheme::VerificationKey;
 use crate::utils::{
     hash_g1, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
 };
+use crate::utils::{G2PCOMPRESSED_SIZE, SCALAR_SIZE, USIZE_SIZE};
 use crate::{elgamal, Attribute, ElGamalKeyPair};
 
 // as per the reference python implementation
 pub type ChallengeDigest = Sha256;
-
-const G2PCOMPRESSED_SIZE: usize = 96;
-const USIZE_SIZE: usize = size_of::<usize>();
-const SCALAR_SIZE: usize = size_of::<Scalar>();
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -788,7 +782,10 @@ impl SetMembershipProof {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct RangeProof {
-    challenge: Scalar, // to remove later after testing
+    base_u: usize,
+    number_of_base_elements_l: usize,
+    a: Scalar, // lower bound
+    b: Scalar, // upper bound
     kappas_a_prime: Vec<G2Projective>,
     kappas_b_prime: Vec<G2Projective>,
     kappa_a_prime: G2Projective,
@@ -808,23 +805,25 @@ impl RangeProof {
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
         private_attributes: &[Attribute],
+        base_u: usize,
+        number_of_base_elements_l: usize,
         a: Scalar, // lower bound
         b: Scalar, // upper bound
-        m_a: &[Scalar; L],
-        m_b: &[Scalar; L],
-        r_a: &[Scalar; L],
-        r_b: &[Scalar; L],
+        m_a: &Vec<Scalar>,
+        m_b: &Vec<Scalar>,
+        r_a: &Vec<Scalar>,
+        r_b: &Vec<Scalar>,
         r1: &Scalar,
         r2: &Scalar,
     ) -> Self {
         // pick random values for each witness
         let r_m = params.n_random_scalars(private_attributes.len() - 1);
 
-        let r_m_a = params.n_random_scalars(L);
-        let r_m_b = params.n_random_scalars(L);
+        let r_m_a = params.n_random_scalars(number_of_base_elements_l);
+        let r_m_b = params.n_random_scalars(number_of_base_elements_l);
 
-        let r_r_a = params.n_random_scalars(L);
-        let r_r_b = params.n_random_scalars(L);
+        let r_r_a = params.n_random_scalars(number_of_base_elements_l);
+        let r_r_b = params.n_random_scalars(number_of_base_elements_l);
         let r_r1 = params.random_scalar();
         let r_r2 = params.random_scalar();
 
@@ -853,16 +852,16 @@ impl RangeProof {
             + r_m_a
                 .iter()
                 .enumerate()
-                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((U as u64).pow(i as u32))))
+                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((base_u as u64).pow(i as u32))))
                 .sum::<G2Projective>();
 
         let mut kappa_b_prime: G2Projective = params.gen2() * r_r2
             + verification_key.alpha
-            + beta1 * (b - Scalar::from((U as u64).pow(L as u32)))
+            + beta1 * (b - Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32)))
             + r_m_b
                 .iter()
                 .enumerate()
-                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((U as u64).pow(i as u32))))
+                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((base_u as u64).pow(i as u32))))
                 .sum::<G2Projective>();
 
         if private_attributes.len() > 1 {
@@ -923,6 +922,10 @@ impl RangeProof {
 
         RangeProof {
             challenge,
+            base_u,
+            number_of_base_elements_l,
+            a,
+            b,
             kappas_a_prime,
             kappas_b_prime,
             kappa_a_prime,
@@ -946,8 +949,6 @@ impl RangeProof {
         params: &Parameters,
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
-        a: Scalar, // lower bound
-        b: Scalar, // upper bound
         kappas_a: &[G2Projective],
         kappas_b: &[G2Projective],
         kappa_a: &G2Projective,
@@ -1023,29 +1024,39 @@ impl RangeProof {
         let beta1 = verification_key.beta[0];
 
         let kappa_a_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_a_prime;
-        let mut kappa_a_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_a + beta1 * -a)
+        let mut kappa_a_rhs = (verification_key.alpha * (-Scalar::one())
+            + kappa_a
+            + beta1 * -self.a)
             * challenge
             + params.gen2() * self.s_r1
-            + beta1 * a
+            + beta1 * self.a
             + self
                 .s_m_a
                 .iter()
                 .enumerate()
-                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((U as u64).pow(i as u32))))
+                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
                 .sum::<G2Projective>();
 
         let kappa_b_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_b_prime;
         let mut kappa_b_rhs = (verification_key.alpha * (-Scalar::one())
             + kappa_b
-            + beta1 * -(b - Scalar::from((U as u64).pow(L as u32))))
+            + beta1
+                * -(self.b
+                    - Scalar::from(
+                        (self.base_u as u64).pow(self.number_of_base_elements_l as u32),
+                    )))
             * challenge
             + params.gen2() * self.s_r2
-            + beta1 * (b - Scalar::from((U as u64).pow(L as u32)))
+            + beta1
+                * (self.b
+                    - Scalar::from(
+                        (self.base_u as u64).pow(self.number_of_base_elements_l as u32),
+                    ))
             + self
                 .s_m_b
                 .iter()
                 .enumerate()
-                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((U as u64).pow(i as u32))))
+                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
                 .sum::<G2Projective>();
 
         if self.s_m.len() > 1 {
@@ -1066,8 +1077,8 @@ impl RangeProof {
     }
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        let total_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
-            + 4 * L * SCALAR_SIZE
+        let total_size = 2 * (self.number_of_base_elements_l + 1) * G2PCOMPRESSED_SIZE
+            + 4 * self.number_of_base_elements_l * SCALAR_SIZE
             + USIZE_SIZE
             + self.s_m.len() * SCALAR_SIZE
             + SCALAR_SIZE
@@ -1117,6 +1128,14 @@ impl RangeProof {
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        // TODO: remove U and L
+        const U: usize = 4;
+        const L: usize = 8;
+        let base_u = 4;
+        let number_of_base_elements_l = 8;
+        let a = Scalar::from(10);
+        let b = Scalar::from(15);
+
         let min_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
             + 4 * L * SCALAR_SIZE
             + USIZE_SIZE
@@ -1245,6 +1264,10 @@ impl RangeProof {
 
         Ok(RangeProof {
             challenge,
+            base_u,
+            number_of_base_elements_l,
+            a,
+            b,
             kappas_a_prime,
             kappas_b_prime,
             kappa_a_prime,
