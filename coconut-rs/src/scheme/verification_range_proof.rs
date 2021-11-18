@@ -14,9 +14,8 @@
 use std::collections::HashMap;
 
 use std::convert::TryFrom;
-use std::convert::TryInto;
 
-use bls12_381::{G2Affine, G2Prepared, G2Projective, Scalar};
+use bls12_381::{G2Prepared, G2Projective, Scalar};
 use group::Curve;
 
 use crate::error::{CoconutError, Result};
@@ -31,7 +30,12 @@ use crate::scheme::{Signature, VerificationKey};
 use crate::traits::{Base58, Bytable};
 
 use crate::utils::RawAttribute;
-use crate::utils::{G2PCOMPRESSED_SIZE, SCALAR_SIZE, SIGNATURE_SIZE, USIZE_SIZE};
+use crate::utils::{
+    deserialize_g2_projective, deserialize_g2_projectives, deserialize_range_proof,
+    deserialize_scalar, deserialize_signature, deserialize_signatures, deserialize_usize,
+    serialize_g2_projective, serialize_g2_projectives, serialize_proof, serialize_scalar,
+    serialize_signature, serialize_signatures, serialize_usize,
+};
 
 use crate::Attribute;
 
@@ -58,93 +62,6 @@ pub struct RangeTheta {
     // non-interactive zero-knowledge proof for lower and upper bound
     nizkp: RangeProof,
 }
-
-fn serialize_usize(u: &usize, bytes: &mut Vec<u8>) {
-    bytes.extend_from_slice(&u.to_be_bytes());
-}
-
-fn deserialize_usize(bytes: &[u8], pointer: &mut usize) -> usize {
-    let pointer_end = *pointer + USIZE_SIZE;
-    let u = usize::from_be_bytes(bytes[*pointer..pointer_end].try_into().unwrap());
-    *pointer = pointer_end;
-
-    u
-}
-
-fn serialize_scalar(s: &Scalar, bytes: &mut Vec<u8>) {
-    bytes.extend_from_slice(&s.to_bytes());
-}
-
-fn deserialize_scalar(bytes: &[u8], pointer: &mut usize) -> Scalar {
-    let pointer_end = *pointer + SCALAR_SIZE;
-    let s = Scalar::from_bytes(&bytes[*pointer..pointer_end].try_into().unwrap()).unwrap();
-    *pointer = pointer_end;
-
-    s
-}
-
-fn serialize_signature(s: &Signature, bytes: &mut Vec<u8>) {
-    bytes.extend_from_slice(&s.to_bytes());
-}
-
-fn serialize_signatures(s: &Vec<Signature>, bytes: &mut Vec<u8>) {
-    s.iter().for_each(|s| serialize_signature(&s, bytes));
-}
-
-fn deserialize_signature(bytes: &[u8], pointer: &mut usize) -> Signature {
-    let pointer_end = *pointer + SIGNATURE_SIZE;
-    let s = Signature::try_from(&bytes[*pointer..pointer_end]).unwrap();
-    *pointer = pointer_end;
-
-    s
-}
-
-fn deserialize_signatures(
-    bytes: &[u8],
-    pointer: &mut usize,
-    number_of_signatures: usize,
-) -> Vec<Signature> {
-    (0..number_of_signatures)
-        .map(|_| deserialize_signature(&bytes, pointer))
-        .collect()
-}
-
-fn serialize_g2_projective(g: &G2Projective, bytes: &mut Vec<u8>) {
-    bytes.extend_from_slice(&g.to_affine().to_compressed());
-}
-
-fn deserialize_g2_projective(bytes: &[u8], pointer: &mut usize) -> G2Projective {
-    let pointer_end = *pointer + G2PCOMPRESSED_SIZE;
-    let g = G2Projective::from(
-        G2Affine::from_compressed(bytes[*pointer..pointer_end].try_into().unwrap()).unwrap(),
-    );
-    *pointer = pointer_end;
-
-    g
-}
-
-fn serialize_g2_projectives(g: &Vec<G2Projective>, bytes: &mut Vec<u8>) {
-    g.iter().for_each(|g| serialize_g2_projective(&g, bytes));
-}
-
-fn deserialize_g2_projectives(
-    bytes: &[u8],
-    pointer: &mut usize,
-    number_of_g2_projectives: usize,
-) -> Vec<G2Projective> {
-    (0..number_of_g2_projectives)
-        .map(|_| deserialize_g2_projective(&bytes, pointer))
-        .collect()
-}
-
-fn serialize_proof(p: &RangeProof, bytes: &mut Vec<u8>) {
-    bytes.extend_from_slice(&p.to_bytes());
-}
-
-fn deserialize_range_proof(bytes: &[u8], pointer: &mut usize) -> RangeProof {
-    RangeProof::from_bytes(&bytes[*pointer..]).unwrap()
-}
-
 impl TryFrom<&[u8]> for RangeTheta {
     type Error = CoconutError;
 
@@ -319,8 +236,8 @@ pub fn compute_u_ary_decomposition(
     let mut decomposition: Vec<Scalar> = Vec::new();
     let mut remainder = number;
 
-    for (i, p) in (0..number_of_base_elements_l).rev().enumerate() {
-        let i_th_pow = base_u.pow(p);
+    for i in (0..number_of_base_elements_l).rev() {
+        let i_th_pow = base_u.pow(i);
         let i_th_base_element = remainder / i_th_pow;
 
         decomposition.push(Scalar::from(i_th_base_element));

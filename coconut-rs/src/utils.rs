@@ -17,17 +17,23 @@ use core::ops::Mul;
 
 use std::mem::size_of;
 
+use std::convert::TryFrom;
 use std::convert::TryInto;
+
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
 use bls12_381::hash_to_curve::{ExpandMsgXmd, HashToCurve, HashToField};
 use bls12_381::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar};
 use ff::Field;
+use group::Curve;
 
 use crate::error::{CoconutError, Result};
+
 use crate::scheme::setup::Parameters;
-use crate::scheme::SignerIndex;
+use crate::scheme::{Signature, SignerIndex};
+
+use crate::proofs::RangeProof;
 
 // default type size for serialization
 pub const G2PCOMPRESSED_SIZE: usize = 96;
@@ -248,6 +254,92 @@ pub(crate) fn try_deserialize_g2_projective(
     Into::<Option<G2Affine>>::into(G2Affine::from_compressed(&bytes))
         .ok_or(err)
         .map(G2Projective::from)
+}
+
+pub fn serialize_usize(u: &usize, bytes: &mut Vec<u8>) {
+    bytes.extend_from_slice(&u.to_be_bytes());
+}
+
+pub fn deserialize_usize(bytes: &[u8], pointer: &mut usize) -> usize {
+    let pointer_end = *pointer + USIZE_SIZE;
+    let u = usize::from_be_bytes(bytes[*pointer..pointer_end].try_into().unwrap());
+    *pointer = pointer_end;
+
+    u
+}
+
+pub fn serialize_scalar(s: &Scalar, bytes: &mut Vec<u8>) {
+    bytes.extend_from_slice(&s.to_bytes());
+}
+
+pub fn deserialize_scalar(bytes: &[u8], pointer: &mut usize) -> Scalar {
+    let pointer_end = *pointer + SCALAR_SIZE;
+    let s = Scalar::from_bytes(&bytes[*pointer..pointer_end].try_into().unwrap()).unwrap();
+    *pointer = pointer_end;
+
+    s
+}
+
+pub fn serialize_signature(s: &Signature, bytes: &mut Vec<u8>) {
+    bytes.extend_from_slice(&s.to_bytes());
+}
+
+pub fn serialize_signatures(s: &Vec<Signature>, bytes: &mut Vec<u8>) {
+    s.iter().for_each(|s| serialize_signature(&s, bytes));
+}
+
+pub fn deserialize_signature(bytes: &[u8], pointer: &mut usize) -> Signature {
+    let pointer_end = *pointer + SIGNATURE_SIZE;
+    let s = Signature::try_from(&bytes[*pointer..pointer_end]).unwrap();
+    *pointer = pointer_end;
+
+    s
+}
+
+pub fn deserialize_signatures(
+    bytes: &[u8],
+    pointer: &mut usize,
+    number_of_signatures: usize,
+) -> Vec<Signature> {
+    (0..number_of_signatures)
+        .map(|_| deserialize_signature(&bytes, pointer))
+        .collect()
+}
+
+pub fn serialize_g2_projective(g: &G2Projective, bytes: &mut Vec<u8>) {
+    bytes.extend_from_slice(&g.to_affine().to_compressed());
+}
+
+pub fn deserialize_g2_projective(bytes: &[u8], pointer: &mut usize) -> G2Projective {
+    let pointer_end = *pointer + G2PCOMPRESSED_SIZE;
+    let g = G2Projective::from(
+        G2Affine::from_compressed(bytes[*pointer..pointer_end].try_into().unwrap()).unwrap(),
+    );
+    *pointer = pointer_end;
+
+    g
+}
+
+pub fn serialize_g2_projectives(g: &Vec<G2Projective>, bytes: &mut Vec<u8>) {
+    g.iter().for_each(|g| serialize_g2_projective(&g, bytes));
+}
+
+pub fn deserialize_g2_projectives(
+    bytes: &[u8],
+    pointer: &mut usize,
+    number_of_g2_projectives: usize,
+) -> Vec<G2Projective> {
+    (0..number_of_g2_projectives)
+        .map(|_| deserialize_g2_projective(&bytes, pointer))
+        .collect()
+}
+
+pub fn serialize_proof(p: &RangeProof, bytes: &mut Vec<u8>) {
+    bytes.extend_from_slice(&p.to_bytes());
+}
+
+pub fn deserialize_range_proof(bytes: &[u8], pointer: &mut usize) -> RangeProof {
+    RangeProof::from_bytes(&bytes[*pointer..]).unwrap()
 }
 
 // use core::fmt;
