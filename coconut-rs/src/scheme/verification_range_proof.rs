@@ -280,11 +280,11 @@ pub fn issue_range_signatures(params: &Parameters) -> SpSignatures {
     issue_membership_signatures(params, &set[..])
 }
 
-fn scalar_smaller_than_2_16(number: Scalar) -> bool {
+fn scalar_fits_in_u64(number: Scalar) -> bool {
     let number_bytes = number.to_bytes();
 
-    // check that only first 16 bits can be set
-    for byte in number_bytes[2..].iter() {
+    // check that only first 64 bits are set
+    for byte in number_bytes[8..].iter() {
         if *byte != 0 {
             return false;
         }
@@ -294,6 +294,11 @@ fn scalar_smaller_than_2_16(number: Scalar) -> bool {
 }
 
 fn scalar_to_u64(number: Scalar) -> u64 {
+    if !scalar_fits_in_u64(number) {
+        panic!("This scalar does not fit in u64");
+    }
+
+    // keep 8 first bytes ~= 64 first bits for u64
     let mut u64_bytes: [u8; 8] = [0; 8];
     let number_bytes = number.to_bytes();
 
@@ -302,27 +307,41 @@ fn scalar_to_u64(number: Scalar) -> u64 {
     u64::from_le_bytes(u64_bytes)
 }
 
-pub fn compute_u_ary_decomposition(number: Scalar) -> [Scalar; L] {
-    let u = U as u64;
-
-    if !scalar_smaller_than_2_16(number) {
-        panic!("number must be in range [0, 2^16)");
-    }
-
+pub fn compute_u_ary_decomposition(
+    number: Scalar,
+    base_u: usize,
+    base_elements_l: usize,
+) -> Vec<Scalar> {
+    // these casts are necessary to compute powers and divisions
+    // may panic if number does not fit in u64
+    // or if base_elements_l doest not fit in u32
+    // but this should usually not happen
     let number = scalar_to_u64(number);
+    let base_u = u64::try_from(base_u).unwrap();
+    let base_elements_l = u32::try_from(base_elements_l).unwrap();
 
-    let mut remainder = number;
-    let mut decomposition: [Scalar; L] = [Scalar::from(0); L];
-
-    for i in (0..L).rev() {
-        let curr_pow = u.pow(i as u32);
-        let i_th = remainder / curr_pow as u64;
-
-        remainder %= curr_pow;
-        decomposition[i] = Scalar::from(i_th as u64);
+    // the decomposition can only be computed for numbers in [0, base_u^base_elements_l)
+    // otherwise it panics
+    if let upper_bound = base_u.pow(base_elements_l) <= number {
+        panic!("this number is out of range to compute {}-ary decomposition on {} base elements ([0, {})).", base_u, base_elements_l, upper_bound);
     }
 
-    // little-endian
+    let mut decomposition: Vec<Scalar> = Vec::new();
+    let mut remainder = number;
+
+    for i in (0..base_elements_l).rev() {
+        let i_th_pow = base_u.pow(i);
+        let i_th_base_element = remainder / i_th_pow;
+
+        decomposition.push(Scalar::from(i_th_base_element));
+        remainder %= i_th_pow;
+    }
+
+    // make sure that returned vec has actually base_elements_l elements"
+    let base_elements_l = usize::try_from(base_elements_l).unwrap();
+    assert_eq!(base_elements_l, decomposition.len());
+
+    // decomposition is big endian: base_u^(base_elements_l - 1) | ... | base_u^1 | base_u^0
     decomposition
 }
 
