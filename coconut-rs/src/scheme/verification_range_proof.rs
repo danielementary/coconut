@@ -301,27 +301,27 @@ fn scalar_to_u64(number: Scalar) -> u64 {
 pub fn compute_u_ary_decomposition(
     number: Scalar,
     base_u: usize,
-    base_elements_l: usize,
+    number_of_base_elements_l: usize,
 ) -> Vec<Scalar> {
     // these casts are necessary to compute powers and divisions
     // may panic if number does not fit in u64
-    // or if base_elements_l doest not fit in u32
+    // or if number_of_base_elements_l doest not fit in u32
     // but this should usually not happen
     let number = scalar_to_u64(number);
     let base_u = u64::try_from(base_u).unwrap();
-    let base_elements_l = u32::try_from(base_elements_l).unwrap();
+    let number_of_base_elements_l = u32::try_from(number_of_base_elements_l).unwrap();
 
-    // the decomposition can only be computed for numbers in [0, base_u^base_elements_l)
+    // the decomposition can only be computed for numbers in [0, base_u^number_of_base_elements_l)
     // otherwise it panics
-    let upper_bound = base_u.pow(base_elements_l);
+    let upper_bound = base_u.pow(number_of_base_elements_l);
     if upper_bound <= number {
-        panic!("this number is out of range to compute {}-ary decomposition on {} base elements ([0, {})).", base_u, base_elements_l, upper_bound);
+        panic!("this number is out of range to compute {}-ary decomposition on {} base elements ([0, {})).", base_u, number_of_base_elements_l, upper_bound);
     }
 
     let mut decomposition: Vec<Scalar> = Vec::new();
     let mut remainder = number;
 
-    for i in (0..base_elements_l).rev() {
+    for i in (0..number_of_base_elements_l).rev() {
         let i_th_pow = base_u.pow(i);
         let i_th_base_element = remainder / i_th_pow;
 
@@ -329,11 +329,11 @@ pub fn compute_u_ary_decomposition(
         remainder %= i_th_pow;
     }
 
-    // make sure that returned vec has actually base_elements_l elements"
-    let base_elements_l = usize::try_from(base_elements_l).unwrap();
-    assert_eq!(base_elements_l, decomposition.len());
+    // make sure that returned vec has actually number_of_base_elements_l elements"
+    let number_of_base_elements_l = usize::try_from(number_of_base_elements_l).unwrap();
+    assert_eq!(number_of_base_elements_l, decomposition.len());
 
-    // decomposition is big endian: base_u^(base_elements_l - 1) | ... | base_u^1 | base_u^0
+    // decomposition is big endian: base_u^(number_of_base_elements_l - 1) | ... | base_u^1 | base_u^0
     decomposition
 }
 
@@ -361,14 +361,14 @@ pub fn pick_signatures_for_decomposition_base_elements(
 
 pub fn prove_credential_and_range(
     params: &Parameters,
+    base_u: usize,
+    number_of_base_elements_l: usize,
+    a: Scalar, // lower bound
+    b: Scalar, // upper bound
     verification_key: &VerificationKey,
     sp_verification_key: &VerificationKey,
     signature: &Signature,
     all_range_signatures: &SpSignatures,
-    base_u: usize,
-    base_elements_l: usize,
-    a: Scalar, // lower bound
-    b: Scalar, // upper bound
     private_attributes: &[Attribute],
 ) -> Result<RangeTheta> {
     if private_attributes.is_empty() {
@@ -395,11 +395,11 @@ pub fn prove_credential_and_range(
     let m = private_attributes[0];
 
     // compute decompositon for m - a and m - b + U^L
-    let m_a = compute_u_ary_decomposition(m - a, base_u, base_elements_l);
+    let m_a = compute_u_ary_decomposition(m - a, base_u, number_of_base_elements_l);
     let m_b = compute_u_ary_decomposition(
-        m - b + Scalar::from((base_u as u64).pow(base_elements_l as u32)),
+        m - b + Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32)),
         base_u,
-        base_elements_l,
+        number_of_base_elements_l,
     );
 
     let a_a =
@@ -436,7 +436,7 @@ pub fn prove_credential_and_range(
         sp_verification_key,
         private_attributes,
         base_u,
-        base_elements_l,
+        number_of_base_elements_l,
         a,
         b,
         &m_a,
