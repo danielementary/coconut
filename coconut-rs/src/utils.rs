@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::collections::HashMap;
 
 use core::iter::Sum;
 use core::ops::Mul;
@@ -31,7 +32,7 @@ use group::Curve;
 use crate::error::{CoconutError, Result};
 
 use crate::scheme::setup::Parameters;
-use crate::scheme::{Signature, SignerIndex};
+use crate::scheme::{Signature, SignerIndex, VerificationKey};
 
 use crate::proofs::RangeProof;
 
@@ -354,6 +355,42 @@ pub fn serialize_proof(p: &RangeProof, bytes: &mut Vec<u8>) {
 
 pub fn deserialize_range_proof(bytes: &[u8], pointer: &mut usize) -> RangeProof {
     RangeProof::from_bytes(&bytes[*pointer..]).unwrap()
+}
+
+// struct that embeds all set membership signatures and corresponding public key
+pub struct SpSignatures {
+    pub signatures: HashMap<RawAttribute, Signature>,
+    pub sp_verification_key: VerificationKey,
+}
+
+pub fn issue_membership_signatures(params: &Parameters, set: &[RawAttribute]) -> SpSignatures {
+    let sp_key_pair = single_attribute_keygen(params); // ideally move it as an argument
+    let h = params.gen1() * params.random_scalar();
+
+    let sp_sk = sp_key_pair.secret_key();
+    let h_sp_sky = h * sp_sk.ys[0];
+
+    let signatures: HashMap<RawAttribute, Signature> = set
+        .iter()
+        .zip(vec![h * sp_sk.x; set.len()].iter())
+        .map(|(attr, h_sp_skx)| {
+            (
+                attr.clone(), // is it possible to avoid clones ?
+                Signature(h, h_sp_skx + (h_sp_sky * (Attribute::from(attr.clone())))),
+            )
+        })
+        .collect();
+
+    if signatures.len() < 2 {
+        panic!("set must contain at least 2 distinct attributes to issue signatures");
+    }
+
+    let sp_verification_key = sp_key_pair.verification_key();
+
+    SpSignatures {
+        signatures,
+        sp_verification_key,
+    }
 }
 
 // use core::fmt;

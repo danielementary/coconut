@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
@@ -22,9 +20,7 @@ use group::Curve;
 
 use crate::error::{CoconutError, Result};
 use crate::proofs::SetMembershipProof;
-use crate::scheme::keygen::single_attribute_keygen;
-use crate::scheme::setup::Parameters;
-use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
+
 use crate::scheme::Signature;
 use crate::scheme::VerificationKey;
 use crate::traits::{Base58, Bytable};
@@ -137,42 +133,6 @@ impl Bytable for SetMembershipTheta {
 }
 
 impl Base58 for SetMembershipTheta {}
-
-// struct that embeds all set membership signatures and corresponding public key
-pub struct SpSignatures {
-    pub signatures: HashMap<RawAttribute, Signature>,
-    pub sp_verification_key: VerificationKey,
-}
-
-pub fn issue_membership_signatures(params: &Parameters, set: &[RawAttribute]) -> SpSignatures {
-    let sp_key_pair = single_attribute_keygen(params); // ideally move it as an argument
-    let h = params.gen1() * params.random_scalar();
-
-    let sp_sk = sp_key_pair.secret_key();
-    let h_sp_sky = h * sp_sk.ys[0];
-
-    let signatures: HashMap<RawAttribute, Signature> = set
-        .iter()
-        .zip(vec![h * sp_sk.x; set.len()].iter())
-        .map(|(attr, h_sp_skx)| {
-            (
-                attr.clone(), // is it possible to avoid clones ?
-                Signature(h, h_sp_skx + (h_sp_sky * (Attribute::from(attr.clone())))),
-            )
-        })
-        .collect();
-
-    if signatures.len() < 2 {
-        panic!("set must contain at least 2 distinct attributes to issue signatures");
-    }
-
-    let sp_verification_key = sp_key_pair.verification_key();
-
-    SpSignatures {
-        signatures,
-        sp_verification_key,
-    }
-}
 
 pub fn prove_credential_and_set_membership(
     params: &Parameters,
