@@ -278,8 +278,8 @@ pub fn prove_credential_and_range(
     params: &Parameters,
     base_u: usize,
     number_of_base_elements_l: usize,
-    lower_bound: &Scalar,
-    upper_bound: &Scalar,
+    lower_bound: Scalar,
+    upper_bound: Scalar,
     // keys
     verification_key: &VerificationKey,
     sp_verification_key: &VerificationKey,
@@ -300,7 +300,7 @@ pub fn prove_credential_and_range(
             CoconutError::Verification("Tried to prove a credential for higher than supported by the provided verification key number of attributes.".to_string()));
     }
 
-    if scalar_to_u64(upper_bound) < scalar_to_u64(lower_bound) {
+    if scalar_to_u64(&upper_bound) < scalar_to_u64(&lower_bound) {
         return Err(CoconutError::Verification(
                 "Tried to prove a credential with inadequate bounds, make sure that upper_bound >= lower_bound.".to_string()));
     }
@@ -384,26 +384,26 @@ pub fn prove_credential_and_range(
 
     let nizkp = RangeProof::construct(
         params,
-        verification_key,
-        sp_verification_key,
-        private_attributes,
         base_u,
         number_of_base_elements_l,
-        lower_bound, // lower bound
-        upper_bound, // upper bound
+        lower_bound,
+        upper_bound,
+        verification_key,
+        sp_verification_key,
         &decomposition_lower_bound,
-        &decomposition_upper_bound,
         &decomposition_blinders_lower_bound,
-        &decomposition_blinders_upper_bound,
         &credential_blinder_lower_bound,
+        &decomposition_upper_bound,
+        &decomposition_blinders_upper_bound,
         &credential_blinder_upper_bound,
+        private_attributes,
     );
 
     Ok(RangeTheta {
         base_u,
         number_of_base_elements_l,
-        lower_bound: *lower_bound,
-        upper_bound: *upper_bound,
+        lower_bound,
+        upper_bound,
         decomposition_randomized_signatures_lower_bound,
         decomposition_kappas_lower_bound,
         randomized_credential_lower_bound,
@@ -494,7 +494,7 @@ pub fn verify_range_credential(
 
 #[cfg(test)]
 mod tests {
-    use crate::scheme::keygen::keygen;
+    // use crate::scheme::keygen::keygen;
     use crate::scheme::setup::setup;
 
     use super::*;

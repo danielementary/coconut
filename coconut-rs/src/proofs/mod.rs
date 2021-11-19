@@ -823,11 +823,13 @@ impl RangeProof {
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
         // decompositions and blinders
+        // lower bounder
         decomposition_lower_bound: &Vec<Scalar>,
-        decomposition_upper_bound: &Vec<Scalar>,
         decomposition_blinders_lower_bound: &Vec<Scalar>,
-        decomposition_blinders_upper_bound: &Vec<Scalar>,
         credential_blinder_lower_bound: &Scalar,
+        // upper bound
+        decomposition_upper_bound: &Vec<Scalar>,
+        decomposition_blinders_upper_bound: &Vec<Scalar>,
         credential_blinder_upper_bound: &Scalar,
         // attributes
         private_attributes: &Vec<Attribute>,
@@ -844,6 +846,7 @@ impl RangeProof {
         let random_credential_blinder_lower_bound = params.random_scalar();
         let random_credential_blinder_upper_bound = params.random_scalar();
 
+        // ignore first attribute as we use its decomposition so no need for a witness
         let random_private_attributes_lower_bound =
             params.n_random_scalars(private_attributes.len() - 1);
         let random_private_attributes_upper_bound =
@@ -980,7 +983,7 @@ impl RangeProof {
             &private_attributes[1..],
         );
         let responses_private_attributes_upper_bound = produce_responses(
-            &random_private_attributes_upper_bound[1..],
+            &random_private_attributes_upper_bound,
             &challenge,
             &private_attributes[1..],
         );
@@ -1018,13 +1021,20 @@ impl RangeProof {
         }
     }
 
+    pub(crate) fn private_attributes(&self) -> usize {
+        self.responses_private_attributes_lower_bound.len()
+    }
+
     pub(crate) fn verify(
         &self,
         params: &Parameters,
+        // keys
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
+        // lower bound
         decomposition_kappas_lower_bound: &Vec<G2Projective>,
         credential_kappa_lower_bound: &G2Projective,
+        // upper bound
         decomposition_kappas_upper_bound: &Vec<G2Projective>,
         credential_kappa_upper_bound: &G2Projective,
     ) -> bool {
@@ -1116,32 +1126,38 @@ impl RangeProof {
 
         let kappa_a_lhs = verification_key.alpha * (-Scalar::one())
             + self.commitment_credential_blinder_lower_bound;
-        let mut kappa_a_rhs = (verification_key.alpha * (-Scalar::one())
+        let kappa_a_rhs = (verification_key.alpha * (-Scalar::one())
             + credential_kappa_lower_bound
-            + beta1 * -self.a)
+            + beta1 * -self.lower_bound)
             * challenge
-            + params.gen2() * self.s_r1
-            + beta1 * self.a
+            + params.gen2() * self.responses_credential_blinder_lower_bound
+            + beta1 * self.lower_bound
             + self
                 .responses_decomposition_lower_bound
                 .iter()
                 .enumerate()
                 .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
+                .sum::<G2Projective>()
+            + self
+                .responses_private_attributes_lower_bound
+                .iter()
+                .zip(verification_key.beta[1..].iter())
+                .map(|(s_mi, beta_i)| beta_i * s_mi)
                 .sum::<G2Projective>();
 
         let kappa_b_lhs = verification_key.alpha * (-Scalar::one())
             + self.commitment_credential_blinder_upper_bound;
-        let mut kappa_b_rhs = (verification_key.alpha * (-Scalar::one())
+        let kappa_b_rhs = (verification_key.alpha * (-Scalar::one())
             + credential_kappa_upper_bound
             + beta1
-                * -(self.b
+                * -(self.upper_bound
                     - Scalar::from(
                         (self.base_u as u64).pow(self.number_of_base_elements_l as u32),
                     )))
             * challenge
-            + params.gen2() * self.s_r2
+            + params.gen2() * self.responses_credential_blinder_upper_bound
             + beta1
-                * (self.b
+                * (self.upper_bound
                     - Scalar::from(
                         (self.base_u as u64).pow(self.number_of_base_elements_l as u32),
                     ))
@@ -1150,18 +1166,13 @@ impl RangeProof {
                 .iter()
                 .enumerate()
                 .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
-                .sum::<G2Projective>();
-
-        if self.s_m.len() > 1 {
-            let partial_kappa: G2Projective = self.s_m[1..]
+                .sum::<G2Projective>()
+            + self
+                .responses_private_attributes_upper_bound
                 .iter()
                 .zip(verification_key.beta[1..].iter())
                 .map(|(s_mi, beta_i)| beta_i * s_mi)
-                .sum();
-
-            kappa_a_rhs += partial_kappa;
-            kappa_b_rhs += partial_kappa;
-        }
+                .sum::<G2Projective>();
 
         kappas_a_lhs == kappas_a_rhs
             && kappas_b_lhs == kappas_b_rhs
@@ -1171,6 +1182,9 @@ impl RangeProof {
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
+
+        // also serialiaze the number of private attributes
+        serialize_usize(&self.private_attributes(), &mut bytes);
 
         serialize_usize(&self.base_u, &mut bytes);
         serialize_usize(&self.number_of_base_elements_l, &mut bytes);
@@ -1204,6 +1218,9 @@ impl RangeProof {
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut pointer = 0;
 
+        // also deserialiaze the number of private attributes
+        let number_of_serialized_private_attributes = deserialize_usize(&bytes, &mut pointer);
+
         let base_u = deserialize_usize(&bytes, &mut pointer);
         let number_of_base_elements_l = deserialize_usize(&bytes, &mut pointer);
 
@@ -1218,8 +1235,11 @@ impl RangeProof {
             deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
         let responses_decomposition_lower_bound =
             deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
-        let responses_private_attributes_lower_bound =
-            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_private_attributes_lower_bound = deserialize_scalars(
+            &bytes,
+            &mut pointer,
+            number_of_serialized_private_attributes,
+        );
         let responses_credential_blinder_lower_bound = deserialize_scalar(&bytes, &mut pointer);
 
         let commitments_decomposition_upper_bound =
@@ -1230,8 +1250,11 @@ impl RangeProof {
             deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
         let responses_decomposition_upper_bound =
             deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
-        let responses_private_attributes_upper_bound =
-            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_private_attributes_upper_bound = deserialize_scalars(
+            &bytes,
+            &mut pointer,
+            number_of_serialized_private_attributes,
+        );
         let responses_credential_blinder_upper_bound = deserialize_scalar(&bytes, &mut pointer);
 
         Ok(RangeProof {
@@ -1258,11 +1281,6 @@ impl RangeProof {
     }
 }
 
-// proof builder:
-// - commitment
-// - challenge
-// - responses
-
 #[cfg(test)]
 mod tests {
     // use crate::Signature;
@@ -1270,8 +1288,8 @@ mod tests {
     // use rand::thread_rng;
 
     // use crate::scheme::issuance::{compute_attribute_encryption, compute_commitment_hash};
-    // use crate::scheme::keygen::{keygen, single_attribute_keygen};
-    // use crate::scheme::setup::setup;
+    use crate::scheme::keygen::{keygen, single_attribute_keygen};
+    use crate::scheme::setup::setup;
     // use crate::scheme::verification::compute_kappa;
     // use crate::scheme::verification_range_proof::{
     //     compute_u_ary_decomposition, issue_range_signatures, pick_signatures_for_decomposition,
@@ -1280,7 +1298,7 @@ mod tests {
 
     // use crate::utils::RawAttribute;
 
-    // use super::*;
+    use super::*;
 
     // const U: usize = 4;
     // const L: usize = 8;
@@ -1851,120 +1869,126 @@ mod tests {
     //         compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
     // }
 
-    // #[test]
-    // fn range_proof_bytes_roundtrip_1() {
-    //     let params = setup(1).unwrap();
+    #[test]
+    fn range_proof_bytes_roundtrip_1() {
+        let params = setup(1).unwrap();
+        let base_u = 4;
+        let number_of_base_elements_l = 8;
+        let lower_bound = params.random_scalar();
+        let upper_bound = params.random_scalar();
 
-    //     let verification_key = keygen(&params).verification_key();
-    //     let sp_verification_key = single_attribute_keygen(&params).verification_key();
-    //     let private_attributes = params.n_random_scalars(1);
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
 
-    //     let a = params.random_scalar();
-    //     let b = params.random_scalar();
+        let decomposition_lower_bound = params.n_random_scalars(number_of_base_elements_l);
+        let decomposition_blinders_lower_bound = params.n_random_scalars(number_of_base_elements_l);
+        let credential_blinder_lower_bound = params.random_scalar();
 
-    //     let m_a = params.n_random_scalars(L).try_into().unwrap();
-    //     let m_b = params.n_random_scalars(L).try_into().unwrap();
+        let decomposition_upper_bound = params.n_random_scalars(number_of_base_elements_l);
+        let decomposition_blinders_upper_bound = params.n_random_scalars(number_of_base_elements_l);
+        let credential_blinder_upper_bound = params.random_scalar();
 
-    //     let r_a = params.n_random_scalars(L).try_into().unwrap();
-    //     let r_b = params.n_random_scalars(L).try_into().unwrap();
+        let private_attributes = params.n_random_scalars(1);
 
-    //     let r1 = params.random_scalar();
-    //     let r2 = params.random_scalar();
+        let nizkp = RangeProof::construct(
+            &params,
+            base_u,
+            number_of_base_elements_l,
+            lower_bound,
+            upper_bound,
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_lower_bound,
+            &decomposition_blinders_lower_bound,
+            &credential_blinder_lower_bound,
+            &decomposition_upper_bound,
+            &decomposition_blinders_upper_bound,
+            &credential_blinder_upper_bound,
+            &private_attributes,
+        );
 
-    //     let pi = RangeProof::construct(
-    //         &params,
-    //         &verification_key,
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         a,
-    //         b,
-    //         &m_a,
-    //         &m_b,
-    //         &r_a,
-    //         &r_b,
-    //         &r1,
-    //         &r2,
-    //     );
+        assert_eq!(RangeProof::from_bytes(&nizkp.to_bytes()).unwrap(), nizkp);
+    }
 
-    //     let bytes = pi.to_bytes();
-    //     assert_eq!(RangeProof::from_bytes(&bytes).unwrap(), pi);
-    // }
+    #[test]
+    fn range_proof_bytes_roundtrip_10() {
+        let params = setup(10).unwrap();
+        let base_u = 4;
+        let number_of_base_elements_l = 8;
+        let lower_bound = params.random_scalar();
+        let upper_bound = params.random_scalar();
 
-    // #[test]
-    // fn range_proof_bytes_roundtrip_10() {
-    //     let params = setup(10).unwrap();
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
 
-    //     let verification_key = keygen(&params).verification_key();
-    //     let sp_verification_key = single_attribute_keygen(&params).verification_key();
-    //     let private_attributes = params.n_random_scalars(10);
+        let decomposition_lower_bound = params.n_random_scalars(number_of_base_elements_l);
+        let decomposition_blinders_lower_bound = params.n_random_scalars(number_of_base_elements_l);
+        let credential_blinder_lower_bound = params.random_scalar();
 
-    //     let a = params.random_scalar();
-    //     let b = params.random_scalar();
+        let decomposition_upper_bound = params.n_random_scalars(number_of_base_elements_l);
+        let decomposition_blinders_upper_bound = params.n_random_scalars(number_of_base_elements_l);
+        let credential_blinder_upper_bound = params.random_scalar();
 
-    //     let m_a = params.n_random_scalars(L).try_into().unwrap();
-    //     let m_b = params.n_random_scalars(L).try_into().unwrap();
+        let private_attributes = params.n_random_scalars(10);
 
-    //     let r_a = params.n_random_scalars(L).try_into().unwrap();
-    //     let r_b = params.n_random_scalars(L).try_into().unwrap();
+        let nizkp = RangeProof::construct(
+            &params,
+            base_u,
+            number_of_base_elements_l,
+            lower_bound,
+            upper_bound,
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_lower_bound,
+            &decomposition_blinders_lower_bound,
+            &credential_blinder_lower_bound,
+            &decomposition_upper_bound,
+            &decomposition_blinders_upper_bound,
+            &credential_blinder_upper_bound,
+            &private_attributes,
+        );
 
-    //     let r1 = params.random_scalar();
-    //     let r2 = params.random_scalar();
+        assert_eq!(RangeProof::from_bytes(&nizkp.to_bytes()).unwrap(), nizkp);
+    }
 
-    //     let pi = RangeProof::construct(
-    //         &params,
-    //         &verification_key,
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         a,
-    //         b,
-    //         &m_a,
-    //         &m_b,
-    //         &r_a,
-    //         &r_b,
-    //         &r1,
-    //         &r2,
-    //     );
+    #[test]
+    fn range_proof_bytes_roundtrip_5_5() {
+        let params = setup(10).unwrap();
+        let base_u = 4;
+        let number_of_base_elements_l = 8;
+        let lower_bound = params.random_scalar();
+        let upper_bound = params.random_scalar();
 
-    //     let bytes = pi.to_bytes();
-    //     assert_eq!(RangeProof::from_bytes(&bytes).unwrap(), pi);
-    // }
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
 
-    // #[test]
-    // fn range_proof_bytes_roundtrip_5_5() {
-    //     let params = setup(10).unwrap();
+        let decomposition_lower_bound = params.n_random_scalars(number_of_base_elements_l);
+        let decomposition_blinders_lower_bound = params.n_random_scalars(number_of_base_elements_l);
+        let credential_blinder_lower_bound = params.random_scalar();
 
-    //     let verification_key = keygen(&params).verification_key();
-    //     let sp_verification_key = single_attribute_keygen(&params).verification_key();
-    //     let private_attributes = params.n_random_scalars(5);
+        let decomposition_upper_bound = params.n_random_scalars(number_of_base_elements_l);
+        let decomposition_blinders_upper_bound = params.n_random_scalars(number_of_base_elements_l);
+        let credential_blinder_upper_bound = params.random_scalar();
 
-    //     let a = params.random_scalar();
-    //     let b = params.random_scalar();
+        let private_attributes = params.n_random_scalars(5);
 
-    //     let m_a = params.n_random_scalars(L).try_into().unwrap();
-    //     let m_b = params.n_random_scalars(L).try_into().unwrap();
+        let nizkp = RangeProof::construct(
+            &params,
+            base_u,
+            number_of_base_elements_l,
+            lower_bound,
+            upper_bound,
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_lower_bound,
+            &decomposition_blinders_lower_bound,
+            &credential_blinder_lower_bound,
+            &decomposition_upper_bound,
+            &decomposition_blinders_upper_bound,
+            &credential_blinder_upper_bound,
+            &private_attributes,
+        );
 
-    //     let r_a = params.n_random_scalars(L).try_into().unwrap();
-    //     let r_b = params.n_random_scalars(L).try_into().unwrap();
-
-    //     let r1 = params.random_scalar();
-    //     let r2 = params.random_scalar();
-
-    //     let pi = RangeProof::construct(
-    //         &params,
-    //         &verification_key,
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         a,
-    //         b,
-    //         &m_a,
-    //         &m_b,
-    //         &r_a,
-    //         &r_b,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     let bytes = pi.to_bytes();
-    //     assert_eq!(RangeProof::from_bytes(&bytes).unwrap(), pi);
-    // }
+        assert_eq!(RangeProof::from_bytes(&nizkp.to_bytes()).unwrap(), nizkp);
+    }
 }
