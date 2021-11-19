@@ -1283,591 +1283,525 @@ impl RangeProof {
 
 #[cfg(test)]
 mod tests {
-    // use crate::Signature;
-    // use group::Group;
-    // use rand::thread_rng;
+    use crate::Signature;
+    use group::Group;
+    use rand::thread_rng;
 
-    // use crate::scheme::issuance::{compute_attribute_encryption, compute_commitment_hash};
+    use crate::scheme::issuance::{compute_attribute_encryption, compute_commitment_hash};
     use crate::scheme::keygen::{keygen, single_attribute_keygen};
     use crate::scheme::setup::setup;
-    // use crate::scheme::verification::compute_kappa;
-    // use crate::scheme::verification_range_proof::{
-    //     compute_u_ary_decomposition, issue_range_signatures, pick_signatures_for_decomposition,
-    // };
-    // use crate::scheme::verification_set_membership::issue_membership_signatures;
+    use crate::scheme::verification::compute_kappa;
+    use crate::scheme::verification_range_proof::{
+        compute_u_ary_decomposition, issue_range_signatures, pick_signatures_for_decomposition,
+    };
+    use crate::scheme::verification_set_membership::issue_membership_signatures;
 
-    // use crate::utils::RawAttribute;
+    use crate::utils::RawAttribute;
 
     use super::*;
 
-    // const U: usize = 4;
-    // const L: usize = 8;
-
-    // #[test]
-    // fn proof_cm_cs_bytes_roundtrip() {
-    //     let mut rng = thread_rng();
-    //     let mut params = setup(1).unwrap();
-
-    //     let elgamal_keypair = elgamal::elgamal_keygen(&params);
-    //     let private_attributes = params.n_random_scalars(1);
-    //     let _public_attributes = params.n_random_scalars(0);
-
-    //     // we don't care about 'correctness' of the proof. only whether we can correctly recover it from bytes
-    //     let cm = G1Projective::random(&mut rng);
-    //     let r = params.random_scalar();
-
-    //     let commitment_hash = compute_commitment_hash(cm);
-    //     let (attributes_ciphertexts, _ephemeral_keys): (Vec<_>, Vec<_>) =
-    //         compute_attribute_encryption(
-    //             &params,
-    //             private_attributes.as_ref(),
-    //             elgamal_keypair.public_key(),
-    //             commitment_hash,
-    //         );
-    //     let ephemeral_keys = params.n_random_scalars(1);
-
-    //     // 0 public 1 private
-    //     let pi_s = ProofCmCs::construct(
-    //         &mut params,
-    //         &elgamal_keypair,
-    //         &ephemeral_keys,
-    //         &cm,
-    //         &r,
-    //         &private_attributes,
-    //         &*attributes_ciphertexts,
-    //     );
-
-    //     let bytes = pi_s.to_bytes();
-    //     assert_eq!(ProofCmCs::from_bytes(&bytes).unwrap(), pi_s);
-
-    //     // 2 public 2 private
-    //     let private_attributes = params.n_random_scalars(2);
-    //     let _public_attributes = params.n_random_scalars(2);
-    //     let ephemeral_keys = params.n_random_scalars(2);
-
-    //     let pi_s = ProofCmCs::construct(
-    //         &mut params,
-    //         &elgamal_keypair,
-    //         &ephemeral_keys,
-    //         &cm,
-    //         &r,
-    //         &private_attributes,
-    //         &*attributes_ciphertexts,
-    //     );
-
-    //     let bytes = pi_s.to_bytes();
-    //     assert_eq!(ProofCmCs::from_bytes(&bytes).unwrap(), pi_s);
-    // }
-
-    // #[test]
-    // fn proof_kappa_nu_bytes_roundtrip() {
-    //     let mut params = setup(1).unwrap();
-
-    //     let keypair = keygen(&mut params);
-    //     let r = params.random_scalar();
-    //     let s = params.random_scalar();
-
-    //     // we don't care about 'correctness' of the proof. only whether we can correctly recover it from bytes
-    //     let _signature = Signature(params.gen1() * r, params.gen1() * s);
-    //     let private_attributes = params.n_random_scalars(1);
-    //     let r = params.random_scalar();
-    //     let kappa = compute_kappa(&params, &keypair.verification_key(), &private_attributes, r);
-
-    //     // 0 public 1 private
-    //     let pi_v = ProofKappaNu::construct(
-    //         &mut params,
-    //         &keypair.verification_key(),
-    //         &private_attributes,
-    //         &r,
-    //         &kappa,
-    //     );
-
-    //     let bytes = pi_v.to_bytes();
-    //     assert_eq!(ProofKappaNu::from_bytes(&bytes).unwrap(), pi_v);
-
-    //     // 2 public 2 private
-    //     let mut params = setup(4).unwrap();
-    //     let keypair = keygen(&mut params);
-    //     let private_attributes = params.n_random_scalars(2);
-
-    //     let pi_v = ProofKappaNu::construct(
-    //         &mut params,
-    //         &keypair.verification_key(),
-    //         &private_attributes,
-    //         &r,
-    //         &kappa,
-    //     );
-
-    //     let bytes = pi_v.to_bytes();
-    //     assert_eq!(ProofKappaNu::from_bytes(&bytes).unwrap(), pi_v);
-    // }
-
-    // #[test]
-    // fn set_membership_proof_correctness_1() {
-    //     let params = setup(1).unwrap();
-
-    //     // define one single private attribute
-    //     let private_attribute = 0;
-    //     let private_attributes = [Scalar::from(private_attribute)];
-
-    //     // issue signatures for the values of the set
-    //     let phi = [
-    //         RawAttribute::Number(0),
-    //         RawAttribute::Number(1),
-    //         RawAttribute::Number(2),
-    //     ];
-    //     let membership_signatures = issue_membership_signatures(&params, &phi);
-
-    //     // pick the right signature for attribute
-    //     let membership_signature = membership_signatures
-    //         .signatures
-    //         .get(&RawAttribute::Number(private_attribute))
-    //         .unwrap();
-    //     let sp_verification_key = membership_signatures.sp_verification_key;
-
-    //     let h = hash_g1("h");
-    //     let key_pair = keygen(&params);
-
-    //     // simulate a valid signature on attribute
-    //     let signature = Signature(
-    //         h,
-    //         h * key_pair.secret_key().x
-    //             + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
-    //     );
-
-    //     let (_a_prime, r1) = membership_signature.randomise(&params);
-    //     let (_sigma_prime, r2) = signature.randomise(&params);
-
-    //     let pi = SetMembershipProof::construct(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     let kappa_1 = compute_kappa(&params, &sp_verification_key, &private_attributes, r1);
-    //     let kappa_2 = compute_kappa(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &private_attributes,
-    //         r2,
-    //     );
-
-    //     // this only checks that signatures are "randomized" as they should
-    //     assert!(pi.verify(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &sp_verification_key,
-    //         &kappa_1,
-    //         &kappa_2
-    //     ));
-    // }
-
-    // #[test]
-    // fn set_membership_proof_correctness_2() {
-    //     let params = setup(2).unwrap();
-
-    //     // define two private attributes but only first is used for set membership
-    //     let private_attribute = 0;
-    //     let private_attributes = [Scalar::from(private_attribute), params.random_scalar()];
-
-    //     // issue signatures for the values of the set
-    //     let phi = [
-    //         RawAttribute::Number(0),
-    //         RawAttribute::Number(1),
-    //         RawAttribute::Number(2),
-    //     ];
-    //     let membership_signatures = issue_membership_signatures(&params, &phi);
-
-    //     // pick the right signature for attribute
-    //     let membership_signature = membership_signatures
-    //         .signatures
-    //         .get(&RawAttribute::Number(private_attribute))
-    //         .unwrap();
-    //     let sp_verification_key = membership_signatures.sp_verification_key;
-
-    //     let h = hash_g1("h");
-    //     let key_pair = keygen(&params);
-
-    //     // simulate a valid signature on attribute
-    //     let signature = Signature(
-    //         h,
-    //         h * key_pair.secret_key().x
-    //             + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attributes[0]))
-    //                 + key_pair.secret_key().ys[1] * (Attribute::from(private_attributes[1]))),
-    //     );
-
-    //     let (_a_prime, r1) = membership_signature.randomise(&params);
-    //     let (_sigma_prime, r2) = signature.randomise(&params);
-
-    //     let pi = SetMembershipProof::construct(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     let kappa_1 = compute_kappa(&params, &sp_verification_key, &private_attributes, r1);
-    //     let kappa_2 = compute_kappa(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &private_attributes,
-    //         r2,
-    //     );
-
-    //     // this only checks that signatures are "randomized" as they should
-    //     assert!(pi.verify(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &sp_verification_key,
-    //         &kappa_1,
-    //         &kappa_2
-    //     ));
-    // }
-
-    // #[test]
-    // fn set_membership_proof_bytes_roundtrip_1() {
-    //     let params = setup(1).unwrap();
-
-    //     let verification_key = keygen(&params).verification_key();
-    //     let sp_verification_key = single_attribute_keygen(&params).verification_key();
-    //     let private_attributes = params.n_random_scalars(1);
-
-    //     let r1 = params.random_scalar();
-    //     let r2 = params.random_scalar();
-
-    //     let pi = SetMembershipProof::construct(
-    //         &params,
-    //         &verification_key,
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     let bytes = pi.to_bytes();
-    //     assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
-    // }
-
-    // #[test]
-    // fn set_membership_proof_bytes_roundtrip_10() {
-    //     let params = setup(10).unwrap();
-
-    //     let verification_key = keygen(&params).verification_key();
-    //     let sp_verification_key = single_attribute_keygen(&params).verification_key();
-    //     let private_attributes = params.n_random_scalars(10);
-
-    //     let r1 = params.random_scalar();
-    //     let r2 = params.random_scalar();
-
-    //     let pi = SetMembershipProof::construct(
-    //         &params,
-    //         &verification_key,
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     let bytes = pi.to_bytes();
-    //     assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
-    // }
-
-    // #[test]
-    // fn set_membership_proof_bytes_roundtrip_5_5() {
-    //     let params = setup(10).unwrap();
-
-    //     let verification_key = keygen(&params).verification_key();
-    //     let sp_verification_key = single_attribute_keygen(&params).verification_key();
-    //     let private_attributes = params.n_random_scalars(5);
-
-    //     let r1 = params.random_scalar();
-    //     let r2 = params.random_scalar();
-
-    //     let pi = SetMembershipProof::construct(
-    //         &params,
-    //         &verification_key,
-    //         &sp_verification_key,
-    //         &private_attributes,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     let bytes = pi.to_bytes();
-    //     assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
-    // }
-
-    // #[test]
-    // fn range_proof_correctness_1() {
-    //     // init parameters for 1 message credential
-    //     let params = setup(1).unwrap();
-
-    //     // define one single private attribute
-    //     let private_attribute = 10;
-    //     let m = Scalar::from(private_attribute);
-    //     let private_attributes = [m];
-
-    //     // define lower and upper bound for range proof
-    //     let a = Scalar::from(5);
-    //     let b = Scalar::from(15);
-
-    //     // issue signatures for all base u elements
-    //     let all_range_signatures = issue_range_signatures(&params);
-    //     let sp_verification_key = &all_range_signatures.sp_verification_key;
-
-    //     // compute u-ary decomposition for m-a and m-b+u^l
-    //     let m_a = compute_u_ary_decomposition(&(m - a), U, L);
-    //     let m_b =
-    //         compute_u_ary_decomposition(&(m - b + Scalar::from((U as u64).pow(L as u32))), U, L);
-
-    //     // pick corresponding signatures for each of the base elements
-    //     let a_a = pick_signatures_for_decomposition(&m_a, &all_range_signatures.signatures);
-    //     let a_b = pick_signatures_for_decomposition(&m_b, &all_range_signatures.signatures);
-
-    //     // "randomise" signatures
-    //     let (a_prime_a, r_a): (Vec<_>, Vec<_>) = a_a.iter().map(|a| a.randomise(&params)).unzip();
-    //     let _a_prime_a: [Signature; L] = a_prime_a.try_into().unwrap();
-    //     let r_a: [Scalar; L] = r_a.try_into().unwrap();
-
-    //     let (a_prime_b, r_b): (Vec<_>, Vec<_>) = a_b.iter().map(|a| a.randomise(&params)).unzip();
-    //     let _a_prime_b: [Signature; L] = a_prime_b.try_into().unwrap();
-    //     let r_b: [Scalar; L] = r_b.try_into().unwrap();
-
-    //     // simulate a valid signature on attribute
-    //     let h = hash_g1("h");
-    //     let key_pair = keygen(&params);
-
-    //     let signature = Signature(
-    //         h,
-    //         h * key_pair.secret_key().x
-    //             + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
-    //     );
-
-    //     let (_sigma_prime_a, r1) = signature.randomise(&params);
-    //     let (_sigma_prime_b, r2) = signature.randomise(&params);
-
-    //     // compute kappas
-    //     let kappas_a: Vec<_> = r_a
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(i, r)| compute_kappa(&params, sp_verification_key, &m_a[i..], *r))
-    //         .collect();
-    //     let kappas_a: [G2Projective; L] = kappas_a.try_into().unwrap();
-
-    //     let kappas_b: Vec<_> = r_b
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(i, r)| compute_kappa(&params, sp_verification_key, &m_b[i..], *r))
-    //         .collect();
-    //     let kappas_b: [G2Projective; L] = kappas_b.try_into().unwrap();
-
-    //     let kappa_a = compute_kappa(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &private_attributes,
-    //         r1,
-    //     );
-    //     let kappa_b = compute_kappa(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &private_attributes,
-    //         r2,
-    //     );
-
-    //     // construct proof
-    //     let pi = RangeProof::construct(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         sp_verification_key,
-    //         &private_attributes,
-    //         a,
-    //         b,
-    //         &m_a,
-    //         &m_b,
-    //         &r_a,
-    //         &r_b,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     // verify that constructed proof is a valid one
-    //     assert!(pi.verify(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         sp_verification_key,
-    //         a,
-    //         b,
-    //         &kappas_a,
-    //         &kappas_b,
-    //         &kappa_a,
-    //         &kappa_b,
-    //     ));
-    // }
-
-    // #[test]
-    // fn range_proof_correctness_2() {
-    //     // init parameters for 2 message credential
-    //     let params = setup(1).unwrap();
-
-    //     // define two private attributes but only the first one is used for range proof
-    //     let private_attribute = 10;
-    //     let m = Scalar::from(private_attribute);
-    //     let private_attributes = [m, params.random_scalar()];
-
-    //     // define lower and upper bound for range proof
-    //     let a = Scalar::from(5);
-    //     let b = Scalar::from(15);
-
-    //     // issue signatures for all base u elements
-    //     let all_range_signatures = issue_range_signatures(&params);
-    //     let sp_verification_key = &all_range_signatures.sp_verification_key;
-
-    //     // compute u-ary decomposition for m-a and m-b+u^l
-    //     let m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
-    //     let m_b: [Scalar; L] =
-    //         compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
-
-    //     // pick corresponding signatures for each of the base elements
-    //     let a_a = pick_range_signatures(&m_a, &all_range_signatures);
-    //     let a_b = pick_range_signatures(&m_b, &all_range_signatures);
-
-    //     // "randomise" signatures
-    //     let (a_prime_a, r_a): (Vec<_>, Vec<_>) = a_a.iter().map(|a| a.randomise(&params)).unzip();
-    //     let _a_prime_a: [Signature; L] = a_prime_a.try_into().unwrap();
-    //     let r_a: [Scalar; L] = r_a.try_into().unwrap();
-
-    //     let (a_prime_b, r_b): (Vec<_>, Vec<_>) = a_b.iter().map(|a| a.randomise(&params)).unzip();
-    //     let _a_prime_b: [Signature; L] = a_prime_b.try_into().unwrap();
-    //     let r_b: [Scalar; L] = r_b.try_into().unwrap();
-
-    //     // simulate a valid signature on attribute
-    //     let h = hash_g1("h");
-    //     let key_pair = keygen(&params);
-
-    //     let signature = Signature(
-    //         h,
-    //         h * key_pair.secret_key().x
-    //             + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
-    //     );
-
-    //     let (_sigma_prime_a, r1) = signature.randomise(&params);
-    //     let (_sigma_prime_b, r2) = signature.randomise(&params);
-
-    //     // compute kappas
-    //     let kappas_a: Vec<_> = r_a
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(i, r)| compute_kappa(&params, sp_verification_key, &m_a[i..], *r))
-    //         .collect();
-    //     let kappas_a: [G2Projective; L] = kappas_a.try_into().unwrap();
-
-    //     let kappas_b: Vec<_> = r_b
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(i, r)| compute_kappa(&params, sp_verification_key, &m_b[i..], *r))
-    //         .collect();
-    //     let kappas_b: [G2Projective; L] = kappas_b.try_into().unwrap();
-
-    //     let kappa_a = compute_kappa(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &private_attributes,
-    //         r1,
-    //     );
-    //     let kappa_b = compute_kappa(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         &private_attributes,
-    //         r2,
-    //     );
-
-    //     // construct proof
-    //     let pi = RangeProof::construct(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         sp_verification_key,
-    //         &private_attributes,
-    //         a,
-    //         b,
-    //         &m_a,
-    //         &m_b,
-    //         &r_a,
-    //         &r_b,
-    //         &r1,
-    //         &r2,
-    //     );
-
-    //     // verify that constructed proof is a valid one
-    //     assert!(pi.verify(
-    //         &params,
-    //         &key_pair.verification_key(),
-    //         sp_verification_key,
-    //         a,
-    //         b,
-    //         &kappas_a,
-    //         &kappas_b,
-    //         &kappa_a,
-    //         &kappa_b,
-    //     ));
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn range_proof_correctness_out_of_bound_panic_1() {
-    //     // define two private attributes but only the first one is used for range proof
-    //     let private_attribute = 10;
-    //     let m = Scalar::from(private_attribute);
-
-    //     // define lower and upper bound for range proof
-    //     let a = Scalar::from(11);
-    //     let b = Scalar::from(15);
-
-    //     // compute u-ary decomposition for m-a and m-b+u^l
-    //     // should panic because the private attribute is not in the given range
-    //     let _m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
-    //     let _m_b: [Scalar; L] =
-    //         compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn range_proof_correctness_out_of_bound_panic_2() {
-    //     // define two private attributes but only the first one is used for range proof
-    //     let private_attribute = 10;
-    //     let m = Scalar::from(private_attribute);
-
-    //     // define lower and upper bound for range proof
-    //     let a = Scalar::from(5);
-    //     let b = Scalar::from(10);
-
-    //     // compute u-ary decomposition for m-a and m-b+u^l
-    //     // should panic because the private attribute is not in the given range
-    //     let _m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
-    //     let _m_b: [Scalar; L] =
-    //         compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn range_proof_correctness_out_of_bound_panic_3() {
-    //     // define two private attributes but only the first one is used for range proof
-    //     let private_attribute = 10;
-    //     let m = Scalar::from(private_attribute);
-
-    //     // define lower and upper bound for range proof
-    //     let a = Scalar::from(5);
-    //     let b = Scalar::from(9);
-
-    //     // compute u-ary decomposition for m-a and m-b+u^l
-    //     // should panic because the private attribute is not in the given range
-    //     let _m_a: [Scalar; L] = compute_u_ary_decomposition(m - a);
-    //     let _m_b: [Scalar; L] =
-    //         compute_u_ary_decomposition(m - b + Scalar::from((U as u64).pow(L as u32)));
-    // }
+    // tests are performed for base u and 8 base elements
+    const U: usize = 4;
+    const L: usize = 8;
+
+    #[test]
+    fn proof_cm_cs_bytes_roundtrip() {
+        let mut rng = thread_rng();
+        let mut params = setup(1).unwrap();
+
+        let elgamal_keypair = elgamal::elgamal_keygen(&params);
+        let private_attributes = params.n_random_scalars(1);
+        let _public_attributes = params.n_random_scalars(0);
+
+        // we don't care about 'correctness' of the proof. only whether we can correctly recover it from bytes
+        let cm = G1Projective::random(&mut rng);
+        let r = params.random_scalar();
+
+        let commitment_hash = compute_commitment_hash(cm);
+        let (attributes_ciphertexts, _ephemeral_keys): (Vec<_>, Vec<_>) =
+            compute_attribute_encryption(
+                &params,
+                private_attributes.as_ref(),
+                elgamal_keypair.public_key(),
+                commitment_hash,
+            );
+        let ephemeral_keys = params.n_random_scalars(1);
+
+        // 0 public 1 private
+        let pi_s = ProofCmCs::construct(
+            &mut params,
+            &elgamal_keypair,
+            &ephemeral_keys,
+            &cm,
+            &r,
+            &private_attributes,
+            &*attributes_ciphertexts,
+        );
+
+        let bytes = pi_s.to_bytes();
+        assert_eq!(ProofCmCs::from_bytes(&bytes).unwrap(), pi_s);
+
+        // 2 public 2 private
+        let private_attributes = params.n_random_scalars(2);
+        let _public_attributes = params.n_random_scalars(2);
+        let ephemeral_keys = params.n_random_scalars(2);
+
+        let pi_s = ProofCmCs::construct(
+            &mut params,
+            &elgamal_keypair,
+            &ephemeral_keys,
+            &cm,
+            &r,
+            &private_attributes,
+            &*attributes_ciphertexts,
+        );
+
+        let bytes = pi_s.to_bytes();
+        assert_eq!(ProofCmCs::from_bytes(&bytes).unwrap(), pi_s);
+    }
+
+    #[test]
+    fn proof_kappa_nu_bytes_roundtrip() {
+        let mut params = setup(1).unwrap();
+
+        let keypair = keygen(&mut params);
+        let r = params.random_scalar();
+        let s = params.random_scalar();
+
+        // we don't care about 'correctness' of the proof. only whether we can correctly recover it from bytes
+        let _signature = Signature(params.gen1() * r, params.gen1() * s);
+        let private_attributes = params.n_random_scalars(1);
+        let r = params.random_scalar();
+        let kappa = compute_kappa(&params, &keypair.verification_key(), &private_attributes, r);
+
+        // 0 public 1 private
+        let pi_v = ProofKappaNu::construct(
+            &mut params,
+            &keypair.verification_key(),
+            &private_attributes,
+            &r,
+            &kappa,
+        );
+
+        let bytes = pi_v.to_bytes();
+        assert_eq!(ProofKappaNu::from_bytes(&bytes).unwrap(), pi_v);
+
+        // 2 public 2 private
+        let mut params = setup(4).unwrap();
+        let keypair = keygen(&mut params);
+        let private_attributes = params.n_random_scalars(2);
+
+        let pi_v = ProofKappaNu::construct(
+            &mut params,
+            &keypair.verification_key(),
+            &private_attributes,
+            &r,
+            &kappa,
+        );
+
+        let bytes = pi_v.to_bytes();
+        assert_eq!(ProofKappaNu::from_bytes(&bytes).unwrap(), pi_v);
+    }
+
+    #[test]
+    fn set_membership_proof_correctness_1() {
+        let params = setup(1).unwrap();
+
+        // define one single private attribute
+        let private_attribute = 0;
+        let private_attributes = [Scalar::from(private_attribute)];
+
+        // issue signatures for the values of the set
+        let phi = [
+            RawAttribute::Number(0),
+            RawAttribute::Number(1),
+            RawAttribute::Number(2),
+        ];
+        let membership_signatures = issue_membership_signatures(&params, &phi);
+
+        // pick the right signature for attribute
+        let membership_signature = membership_signatures
+            .signatures
+            .get(&RawAttribute::Number(private_attribute))
+            .unwrap();
+        let sp_verification_key = membership_signatures.sp_verification_key;
+
+        let h = hash_g1("h");
+        let key_pair = keygen(&params);
+
+        // simulate a valid signature on attribute
+        let signature = Signature(
+            h,
+            h * key_pair.secret_key().x
+                + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
+        );
+
+        let (_a_prime, r1) = membership_signature.randomise(&params);
+        let (_sigma_prime, r2) = signature.randomise(&params);
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &key_pair.verification_key(),
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let kappa_1 = compute_kappa(&params, &sp_verification_key, &private_attributes, r1);
+        let kappa_2 = compute_kappa(
+            &params,
+            &key_pair.verification_key(),
+            &private_attributes,
+            r2,
+        );
+
+        // this only checks that signatures are "randomized" as they should
+        assert!(pi.verify(
+            &params,
+            &key_pair.verification_key(),
+            &sp_verification_key,
+            &kappa_1,
+            &kappa_2
+        ));
+    }
+
+    #[test]
+    fn set_membership_proof_correctness_2() {
+        let params = setup(2).unwrap();
+
+        // define two private attributes but only first is used for set membership
+        let private_attribute = 0;
+        let private_attributes = [Scalar::from(private_attribute), params.random_scalar()];
+
+        // issue signatures for the values of the set
+        let phi = [
+            RawAttribute::Number(0),
+            RawAttribute::Number(1),
+            RawAttribute::Number(2),
+        ];
+        let membership_signatures = issue_membership_signatures(&params, &phi);
+
+        // pick the right signature for attribute
+        let membership_signature = membership_signatures
+            .signatures
+            .get(&RawAttribute::Number(private_attribute))
+            .unwrap();
+        let sp_verification_key = membership_signatures.sp_verification_key;
+
+        let h = hash_g1("h");
+        let key_pair = keygen(&params);
+
+        // simulate a valid signature on attribute
+        let signature = Signature(
+            h,
+            h * key_pair.secret_key().x
+                + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attributes[0]))
+                    + key_pair.secret_key().ys[1] * (Attribute::from(private_attributes[1]))),
+        );
+
+        let (_a_prime, r1) = membership_signature.randomise(&params);
+        let (_sigma_prime, r2) = signature.randomise(&params);
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &key_pair.verification_key(),
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let kappa_1 = compute_kappa(&params, &sp_verification_key, &private_attributes, r1);
+        let kappa_2 = compute_kappa(
+            &params,
+            &key_pair.verification_key(),
+            &private_attributes,
+            r2,
+        );
+
+        // this only checks that signatures are "randomized" as they should
+        assert!(pi.verify(
+            &params,
+            &key_pair.verification_key(),
+            &sp_verification_key,
+            &kappa_1,
+            &kappa_2
+        ));
+    }
+
+    #[test]
+    fn set_membership_proof_bytes_roundtrip_1() {
+        let params = setup(1).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(1);
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
+    }
+
+    #[test]
+    fn set_membership_proof_bytes_roundtrip_10() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(10);
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
+    }
+
+    #[test]
+    fn set_membership_proof_bytes_roundtrip_5_5() {
+        let params = setup(10).unwrap();
+
+        let verification_key = keygen(&params).verification_key();
+        let sp_verification_key = single_attribute_keygen(&params).verification_key();
+        let private_attributes = params.n_random_scalars(5);
+
+        let r1 = params.random_scalar();
+        let r2 = params.random_scalar();
+
+        let pi = SetMembershipProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &private_attributes,
+            &r1,
+            &r2,
+        );
+
+        let bytes = pi.to_bytes();
+        assert_eq!(SetMembershipProof::from_bytes(&bytes).unwrap(), pi);
+    }
+
+    #[test]
+    fn range_proof_correctness_1() {
+        // init parameters for 1 message credential
+        let params = setup(1).unwrap();
+
+        let base_u = U;
+        let number_of_base_elements_l = L;
+        let lower_bound = Scalar::from(5);
+        let upper_bound = Scalar::from(15);
+
+        // define one single private attribute
+        let private_attribute = 10;
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+        let private_attributes = vec![private_attribute_for_proof];
+
+        // simulate a valid signature on attribute
+        let h = hash_g1("h");
+        let key_pair = keygen(&params);
+        let verification_key = key_pair.verification_key();
+
+        let credential = Signature(
+            h,
+            h * key_pair.secret_key().x
+                + h * (key_pair.secret_key().ys[0] * (Attribute::from(private_attribute))),
+        );
+
+        // issue signatures for all base u elements
+        let sp_signatures = issue_range_signatures(&params);
+        let sp_verification_key = &sp_signatures.sp_verification_key;
+
+        let decomposition_lower_bound = compute_u_ary_decomposition(
+            &(private_attribute_for_proof - lower_bound),
+            base_u,
+            number_of_base_elements_l,
+        );
+        let decomposition_signatures_lower_bound = pick_signatures_for_decomposition(
+            &decomposition_lower_bound,
+            &sp_signatures.signatures,
+        );
+        let (_decomposition_randomized_signatures_lower_bound, decomposition_blinders_lower_bound): (
+        Vec<_>,
+        Vec<_>,
+    ) = decomposition_signatures_lower_bound
+        .iter()
+        .map(|s| s.randomise(&params))
+        .unzip();
+        let (_randomized_credential_lower_bound, credential_blinder_lower_bound) =
+            credential.randomise(&params);
+        let decomposition_kappas_lower_bound = decomposition_blinders_lower_bound
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                compute_kappa(
+                    &params,
+                    &sp_verification_key,
+                    &decomposition_lower_bound[i..],
+                    *b,
+                )
+            })
+            .collect();
+        let credential_kappa_lower_bound = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder_lower_bound,
+        );
+
+        // upper bound run
+        let decomposition_upper_bound = compute_u_ary_decomposition(
+            &(private_attribute_for_proof - upper_bound
+                + Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32))),
+            base_u,
+            number_of_base_elements_l,
+        );
+        let decomposition_signatures_upper_bound = pick_signatures_for_decomposition(
+            &decomposition_upper_bound,
+            &sp_signatures.signatures,
+        );
+        let (_decomposition_randomized_signatures_upper_bound, decomposition_blinders_upper_bound): (
+        Vec<_>,
+        Vec<_>,
+    ) = decomposition_signatures_upper_bound
+        .iter()
+        .map(|s| s.randomise(&params))
+        .unzip();
+        let (_randomized_credential_upper_bound, credential_blinder_upper_bound) =
+            credential.randomise(&params);
+        let decomposition_kappas_upper_bound = decomposition_blinders_upper_bound
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                compute_kappa(
+                    &params,
+                    &sp_verification_key,
+                    &decomposition_upper_bound[i..],
+                    *b,
+                )
+            })
+            .collect();
+        let credential_kappa_upper_bound = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder_upper_bound,
+        );
+
+        let nizkp = RangeProof::construct(
+            &params,
+            base_u,
+            number_of_base_elements_l,
+            lower_bound,
+            upper_bound,
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_lower_bound,
+            &decomposition_blinders_lower_bound,
+            &credential_blinder_lower_bound,
+            &decomposition_upper_bound,
+            &decomposition_blinders_upper_bound,
+            &credential_blinder_upper_bound,
+            &private_attributes,
+        );
+
+        // verify that constructed proof is a valid one
+        assert!(nizkp.verify(
+            &params,
+            &key_pair.verification_key(),
+            &sp_verification_key,
+            &decomposition_kappas_lower_bound,
+            &credential_kappa_lower_bound,
+            &decomposition_kappas_upper_bound,
+            &credential_kappa_upper_bound,
+        ));
+    }
+
+    #[test]
+    #[should_panic]
+    fn range_proof_correctness_out_of_bound_panic_1() {
+        // define two private attributes but only the first one is used for range proof
+        let private_attribute = 10;
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+
+        // define lower and upper bound for range proof
+        let a = Scalar::from(11);
+        let b = Scalar::from(15);
+
+        // compute u-ary decomposition for private_attribute_for_proof-a and
+        // private_attribute_for_proof-b+u^l
+        // should panic because the private attribute is not in the given range
+        compute_u_ary_decomposition(&(private_attribute_for_proof - a), U, L);
+        compute_u_ary_decomposition(
+            &(private_attribute_for_proof - b + Scalar::from((U as u64).pow(L as u32))),
+            U,
+            L,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn range_proof_correctness_out_of_bound_panic_2() {
+        // define two private attributes but only the first one is used for range proof
+        let private_attribute = 15;
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+
+        // define lower and upper bound for range proof
+        let a = Scalar::from(11);
+        let b = Scalar::from(15);
+
+        // compute u-ary decomposition for private_attribute_for_proof-a and
+        // private_attribute_for_proof-b+u^l
+        // should panic because the private attribute is not in the given range
+        compute_u_ary_decomposition(&(private_attribute_for_proof - a), U, L);
+        compute_u_ary_decomposition(
+            &(private_attribute_for_proof - b + Scalar::from((U as u64).pow(L as u32))),
+            U,
+            L,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn range_proof_correctness_out_of_bound_panic_3() {
+        // define two private attributes but only the first one is used for range proof
+        let private_attribute = 16;
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+
+        // define lower and upper bound for range proof
+        let a = Scalar::from(11);
+        let b = Scalar::from(15);
+
+        // compute u-ary decomposition for private_attribute_for_proof-a and
+        // private_attribute_for_proof-b+u^l
+        // should panic because the private attribute is not in the given range
+        compute_u_ary_decomposition(&(private_attribute_for_proof - a), U, L);
+        compute_u_ary_decomposition(
+            &(private_attribute_for_proof - b + Scalar::from((U as u64).pow(L as u32))),
+            U,
+            L,
+        );
+    }
 
     #[test]
     fn range_proof_bytes_roundtrip_1() {
