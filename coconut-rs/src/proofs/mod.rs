@@ -30,7 +30,15 @@ use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
 use crate::scheme::VerificationKey;
 use crate::utils::{
+    deserialize_g2_projective, deserialize_g2_projectives, deserialize_scalar, deserialize_scalars,
+    deserialize_usize,
+};
+use crate::utils::{
     hash_g1, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
+};
+use crate::utils::{
+    serialize_g2_projective, serialize_g2_projectives, serialize_scalar, serialize_scalars,
+    serialize_usize,
 };
 use crate::utils::{G2PCOMPRESSED_SIZE, SCALAR_SIZE, USIZE_SIZE};
 use crate::{elgamal, Attribute, ElGamalKeyPair};
@@ -1010,28 +1018,24 @@ impl RangeProof {
         }
     }
 
-    pub(crate) fn private_attributes(&self) -> usize {
-        self.s_m.len()
-    }
-
     pub(crate) fn verify(
         &self,
         params: &Parameters,
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
-        kappas_a: &[G2Projective],
-        kappa_a: &G2Projective,
-        kappas_b: &[G2Projective],
-        kappa_b: &G2Projective,
+        decomposition_kappas_lower_bound: &Vec<G2Projective>,
+        credential_kappa_lower_bound: &G2Projective,
+        decomposition_kappas_upper_bound: &Vec<G2Projective>,
+        credential_kappa_upper_bound: &G2Projective,
     ) -> bool {
-        let kappas_a_prime_bytes = self
-            .kappas_a_prime
+        let commitments_decomposition_lower_bound_bytes = self
+            .commitments_decomposition_lower_bound
             .iter()
             .map(|k| k.to_bytes())
             .collect::<Vec<_>>();
 
-        let kappas_b_prime_bytes = self
-            .kappas_b_prime
+        let commitments_decomposition_upper_bound_bytes = self
+            .commitments_decomposition_upper_bound
             .iter()
             .map(|k| k.to_bytes())
             .collect::<Vec<_>>();
@@ -1043,12 +1047,24 @@ impl RangeProof {
 
         // recompute challenge
         let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            kappas_a_prime_bytes
+            commitments_decomposition_lower_bound_bytes
                 .iter()
                 .map(|b| b.as_ref())
-                .chain(kappas_b_prime_bytes.iter().map(|b| b.as_ref()))
-                .chain(std::iter::once(self.kappa_a_prime.to_bytes().as_ref()))
-                .chain(std::iter::once(self.kappa_b_prime.to_bytes().as_ref()))
+                .chain(
+                    commitments_decomposition_upper_bound_bytes
+                        .iter()
+                        .map(|b| b.as_ref()),
+                )
+                .chain(std::iter::once(
+                    self.commitment_credential_blinder_lower_bound
+                        .to_bytes()
+                        .as_ref(),
+                ))
+                .chain(std::iter::once(
+                    self.commitment_credential_blinder_upper_bound
+                        .to_bytes()
+                        .as_ref(),
+                ))
                 .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
                 .chain(std::iter::once(
                     sp_verification_key.alpha.to_bytes().as_ref(),
@@ -1061,52 +1077,62 @@ impl RangeProof {
         );
 
         let kappas_a_lhs = self
-            .kappas_a_prime
+            .commitments_decomposition_lower_bound
             .iter()
             .map(|k| sp_verification_key.alpha * (-Scalar::one()) + k)
             .collect::<Vec<_>>();
 
         let kappas_b_lhs = self
-            .kappas_b_prime
+            .commitments_decomposition_upper_bound
             .iter()
             .map(|k| sp_verification_key.alpha * (-Scalar::one()) + k)
             .collect::<Vec<_>>();
 
-        let kappas_a_rhs = izip!(kappas_a, &self.s_r_a, &self.s_m_a)
-            .map(|(k, r, m)| {
-                (sp_verification_key.alpha * (-Scalar::one()) + k) * challenge
-                    + params.gen2() * r
-                    + sp_verification_key.beta[0] * m
-            })
-            .collect::<Vec<_>>();
+        let kappas_a_rhs = izip!(
+            decomposition_kappas_lower_bound,
+            &self.responses_decomposition_blinders_lower_bound,
+            &self.responses_decomposition_lower_bound
+        )
+        .map(|(k, r, m)| {
+            (sp_verification_key.alpha * (-Scalar::one()) + k) * challenge
+                + params.gen2() * r
+                + sp_verification_key.beta[0] * m
+        })
+        .collect::<Vec<_>>();
 
-        let kappas_b_rhs = izip!(kappas_b, &self.s_r_b, &self.s_m_b)
-            .map(|(k, r, m)| {
-                (sp_verification_key.alpha * (-Scalar::one()) + k) * challenge
-                    + params.gen2() * r
-                    + sp_verification_key.beta[0] * m
-            })
-            .collect::<Vec<_>>();
+        let kappas_b_rhs = izip!(
+            decomposition_kappas_upper_bound,
+            &self.responses_decomposition_blinders_upper_bound,
+            &self.responses_decomposition_upper_bound
+        )
+        .map(|(k, r, m)| {
+            (sp_verification_key.alpha * (-Scalar::one()) + k) * challenge
+                + params.gen2() * r
+                + sp_verification_key.beta[0] * m
+        })
+        .collect::<Vec<_>>();
 
         let beta1 = verification_key.beta[0];
 
-        let kappa_a_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_a_prime;
+        let kappa_a_lhs = verification_key.alpha * (-Scalar::one())
+            + self.commitment_credential_blinder_lower_bound;
         let mut kappa_a_rhs = (verification_key.alpha * (-Scalar::one())
-            + kappa_a
+            + credential_kappa_lower_bound
             + beta1 * -self.a)
             * challenge
             + params.gen2() * self.s_r1
             + beta1 * self.a
             + self
-                .s_m_a
+                .responses_decomposition_lower_bound
                 .iter()
                 .enumerate()
                 .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
                 .sum::<G2Projective>();
 
-        let kappa_b_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_b_prime;
+        let kappa_b_lhs = verification_key.alpha * (-Scalar::one())
+            + self.commitment_credential_blinder_upper_bound;
         let mut kappa_b_rhs = (verification_key.alpha * (-Scalar::one())
-            + kappa_b
+            + credential_kappa_upper_bound
             + beta1
                 * -(self.b
                     - Scalar::from(
@@ -1120,7 +1146,7 @@ impl RangeProof {
                         (self.base_u as u64).pow(self.number_of_base_elements_l as u32),
                     ))
             + self
-                .s_m_b
+                .responses_decomposition_upper_bound
                 .iter()
                 .enumerate()
                 .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
@@ -1144,197 +1170,90 @@ impl RangeProof {
     }
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        let total_size = 2 * (self.number_of_base_elements_l + 1) * G2PCOMPRESSED_SIZE
-            + 4 * self.number_of_base_elements_l * SCALAR_SIZE
-            + USIZE_SIZE
-            + self.s_m.len() * SCALAR_SIZE
-            + SCALAR_SIZE
-            + SCALAR_SIZE
-            + SCALAR_SIZE;
+        let mut bytes = Vec::new();
 
-        let mut bytes = Vec::with_capacity(total_size);
+        serialize_usize(&self.base_u, &mut bytes);
+        serialize_usize(&self.number_of_base_elements_l, &mut bytes);
 
-        for k in &self.kappas_a_prime {
-            bytes.extend_from_slice(&k.to_affine().to_compressed());
-        }
+        serialize_scalar(&self.lower_bound, &mut bytes);
+        serialize_scalar(&self.upper_bound, &mut bytes);
 
-        for k in &self.kappas_b_prime {
-            bytes.extend_from_slice(&k.to_affine().to_compressed());
-        }
+        serialize_g2_projectives(&self.commitments_decomposition_lower_bound, &mut bytes);
+        serialize_g2_projective(&self.commitment_credential_blinder_lower_bound, &mut bytes);
+        serialize_scalars(
+            &self.responses_decomposition_blinders_lower_bound,
+            &mut bytes,
+        );
+        serialize_scalars(&self.responses_decomposition_lower_bound, &mut bytes);
+        serialize_scalars(&self.responses_private_attributes_lower_bound, &mut bytes);
+        serialize_scalar(&self.responses_credential_blinder_lower_bound, &mut bytes);
 
-        bytes.extend_from_slice(&self.kappa_a_prime.to_affine().to_compressed());
-        bytes.extend_from_slice(&self.kappa_b_prime.to_affine().to_compressed());
-
-        for s in &self.s_m_a {
-            bytes.extend_from_slice(&s.to_bytes());
-        }
-
-        for s in &self.s_m_b {
-            bytes.extend_from_slice(&s.to_bytes());
-        }
-
-        for s in &self.s_r_a {
-            bytes.extend_from_slice(&s.to_bytes());
-        }
-
-        for s in &self.s_r_b {
-            bytes.extend_from_slice(&s.to_bytes());
-        }
-
-        bytes.extend_from_slice(&self.s_m.len().to_le_bytes());
-        for m in &self.s_m {
-            bytes.extend_from_slice(&m.to_bytes());
-        }
-
-        bytes.extend_from_slice(&self.s_r1.to_bytes());
-        bytes.extend_from_slice(&self.s_r2.to_bytes());
+        serialize_g2_projectives(&self.commitments_decomposition_upper_bound, &mut bytes);
+        serialize_g2_projective(&self.commitment_credential_blinder_upper_bound, &mut bytes);
+        serialize_scalars(
+            &self.responses_decomposition_blinders_upper_bound,
+            &mut bytes,
+        );
+        serialize_scalars(&self.responses_decomposition_upper_bound, &mut bytes);
+        serialize_scalars(&self.responses_private_attributes_upper_bound, &mut bytes);
+        serialize_scalar(&self.responses_credential_blinder_upper_bound, &mut bytes);
 
         bytes
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        // TODO: remove U and L
-        const L: usize = 8;
-        let base_u = 4;
-        let number_of_base_elements_l = 8;
-        let a = Scalar::from(10);
-        let b = Scalar::from(15);
+        let mut pointer = 0;
 
-        let min_size = 2 * (L + 1) * G2PCOMPRESSED_SIZE
-            + 4 * L * SCALAR_SIZE
-            + USIZE_SIZE
-            + SCALAR_SIZE
-            + SCALAR_SIZE
-            + SCALAR_SIZE;
+        let base_u = deserialize_usize(&bytes, &mut pointer);
+        let number_of_base_elements_l = deserialize_usize(&bytes, &mut pointer);
 
-        if bytes.len() < min_size || (bytes.len() - min_size) % SCALAR_SIZE != 0 {
-            return Err(CoconutError::DeserializationInvalidLength {
-                actual: bytes.len(),
-                modulus_target: bytes.len() - min_size,
-                modulus: SCALAR_SIZE,
-                object:
-                    "kappas_a', kappas_b', kappa_a', kappa_b', s_m_a, s_m_b, s_r_a, s_r_b, s_m, s_r1, s_r2"
-                        .to_string(),
-                target: min_size,
-            });
-        }
+        let lower_bound = deserialize_scalar(&bytes, &mut pointer);
+        let upper_bound = deserialize_scalar(&bytes, &mut pointer);
 
-        let mut p = 0;
+        let commitments_decomposition_lower_bound =
+            deserialize_g2_projectives(&bytes, &mut pointer, number_of_base_elements_l);
+        let commitment_credential_blinder_lower_bound =
+            deserialize_g2_projective(&bytes, &mut pointer);
+        let responses_decomposition_blinders_lower_bound =
+            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_decomposition_lower_bound =
+            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_private_attributes_lower_bound =
+            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_credential_blinder_lower_bound = deserialize_scalar(&bytes, &mut pointer);
 
-        let mut kappas_a_prime: [G2Projective; L] = [G2Projective::default(); L];
-        for i in 0..L {
-            let kappas_a_prime_i_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
-            kappas_a_prime[i] = try_deserialize_g2_projective(
-                &kappas_a_prime_i_bytes,
-                CoconutError::Deserialization("failed to deserialize kappas_a_prime".to_string()),
-            )?;
-
-            p += G2PCOMPRESSED_SIZE;
-        }
-        let kappas_a_prime = kappas_a_prime.to_vec();
-
-        let mut kappas_b_prime: [G2Projective; L] = [G2Projective::default(); L];
-        for i in 0..L {
-            let kappas_b_prime_i_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
-            kappas_b_prime[i] = try_deserialize_g2_projective(
-                &kappas_b_prime_i_bytes,
-                CoconutError::Deserialization("failed to deserialize kappas_b_prime".to_string()),
-            )?;
-
-            p += G2PCOMPRESSED_SIZE;
-        }
-        let kappas_b_prime = kappas_b_prime.to_vec();
-
-        let kappa_a_prime_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
-        p += G2PCOMPRESSED_SIZE;
-
-        let kappa_a_prime = try_deserialize_g2_projective(
-            &kappa_a_prime_bytes,
-            CoconutError::Deserialization("failed to deserialize kappa_a'".to_string()),
-        )?;
-
-        let kappa_b_prime_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
-        p += G2PCOMPRESSED_SIZE;
-
-        let kappa_b_prime = try_deserialize_g2_projective(
-            &kappa_b_prime_bytes,
-            CoconutError::Deserialization("failed to deserialize kappa_b'".to_string()),
-        )?;
-
-        let p_next = p + L * SCALAR_SIZE;
-        let s_m_a = try_deserialize_scalar_vec(
-            L as u64,
-            &bytes[p..p_next],
-            CoconutError::Deserialization("Failed to deserialize s_m_a".to_string()),
-        )?;
-        p = p_next;
-
-        let p_next = p + L * SCALAR_SIZE;
-        let s_m_b = try_deserialize_scalar_vec(
-            L as u64,
-            &bytes[p..p_next],
-            CoconutError::Deserialization("Failed to deserialize s_m_b".to_string()),
-        )?;
-        p = p_next;
-
-        let p_next = p + L * SCALAR_SIZE;
-        let s_r_a = try_deserialize_scalar_vec(
-            L as u64,
-            &bytes[p..p_next],
-            CoconutError::Deserialization("Failed to deserialize s_r_a".to_string()),
-        )?;
-        p = p_next;
-
-        let p_next = p + L * SCALAR_SIZE;
-        let s_r_b = try_deserialize_scalar_vec(
-            L as u64,
-            &bytes[p..p_next],
-            CoconutError::Deserialization("Failed to deserialize s_r_b".to_string()),
-        )?;
-        p = p_next;
-
-        let s_m_len = u64::from_le_bytes(bytes[p..p + USIZE_SIZE].try_into().unwrap());
-        p += USIZE_SIZE;
-
-        let p_temp = p + (s_m_len as usize) * SCALAR_SIZE;
-        let s_m = try_deserialize_scalar_vec(
-            s_m_len,
-            &bytes[p..p_temp],
-            CoconutError::Deserialization("Failed to deserialize s_m".to_string()),
-        )?;
-        p = p_temp;
-
-        let s_r1_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
-        p += SCALAR_SIZE;
-
-        let s_r1 = try_deserialize_scalar(
-            &s_r1_bytes,
-            CoconutError::Deserialization("failed to deserialize the s_r1".to_string()),
-        )?;
-
-        let s_r2_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
-
-        let s_r2 = try_deserialize_scalar(
-            &s_r2_bytes,
-            CoconutError::Deserialization("failed to deserialize the s_r2".to_string()),
-        )?;
+        let commitments_decomposition_upper_bound =
+            deserialize_g2_projectives(&bytes, &mut pointer, number_of_base_elements_l);
+        let commitment_credential_blinder_upper_bound =
+            deserialize_g2_projective(&bytes, &mut pointer);
+        let responses_decomposition_blinders_upper_bound =
+            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_decomposition_upper_bound =
+            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_private_attributes_upper_bound =
+            deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
+        let responses_credential_blinder_upper_bound = deserialize_scalar(&bytes, &mut pointer);
 
         Ok(RangeProof {
+            // parameters
             base_u,
             number_of_base_elements_l,
-            a,
-            b,
-            kappas_a_prime,
-            kappas_b_prime,
-            kappa_a_prime,
-            kappa_b_prime,
-            s_m_a,
-            s_m_b,
-            s_r_a,
-            s_r_b,
-            s_m,
-            s_r1,
-            s_r2,
+            lower_bound,
+            upper_bound,
+            // lower bound
+            commitments_decomposition_lower_bound,
+            commitment_credential_blinder_lower_bound,
+            responses_decomposition_blinders_lower_bound,
+            responses_decomposition_lower_bound,
+            responses_private_attributes_lower_bound,
+            responses_credential_blinder_lower_bound,
+            // upper bound
+            commitments_decomposition_upper_bound,
+            commitment_credential_blinder_upper_bound,
+            responses_decomposition_blinders_upper_bound,
+            responses_decomposition_upper_bound,
+            responses_private_attributes_upper_bound,
+            responses_credential_blinder_upper_bound,
         })
     }
 }

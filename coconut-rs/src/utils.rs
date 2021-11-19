@@ -272,12 +272,26 @@ pub fn serialize_scalar(s: &Scalar, bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&s.to_bytes());
 }
 
+pub fn serialize_scalars(s: &Vec<Scalar>, bytes: &mut Vec<u8>) {
+    s.iter().for_each(|s| serialize_scalar(&s, bytes));
+}
+
 pub fn deserialize_scalar(bytes: &[u8], pointer: &mut usize) -> Scalar {
     let pointer_end = *pointer + SCALAR_SIZE;
     let s = Scalar::from_bytes(&bytes[*pointer..pointer_end].try_into().unwrap()).unwrap();
     *pointer = pointer_end;
 
     s
+}
+
+pub fn deserialize_scalars(
+    bytes: &[u8],
+    pointer: &mut usize,
+    number_of_scalars: usize,
+) -> Vec<Scalar> {
+    (0..number_of_scalars)
+        .map(|_| deserialize_scalar(&bytes, pointer))
+        .collect()
 }
 
 pub fn serialize_signature(s: &Signature, bytes: &mut Vec<u8>) {
