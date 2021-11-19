@@ -779,112 +779,128 @@ impl SetMembershipProof {
     }
 }
 
-// TODO: reprendre here
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct RangeProof {
+    // parameters
     base_u: usize,
     number_of_base_elements_l: usize,
     lower_bound: Scalar,
     upper_bound: Scalar,
     // lower bound
-    commitment_credential_blinder_lower_bound: G2Projective,
     commitments_decomposition_lower_bound: Vec<G2Projective>,
-    responses_decomposition_lower_bound: Vec<Scalar>,
+    commitment_credential_blinder_lower_bound: G2Projective,
     responses_decomposition_blinders_lower_bound: Vec<Scalar>,
-    // upper bound
-    commitment_credential_blinder_upper_bound: G2Projective,
-    commitments_decomposition_upper_bound: Vec<G2Projective>,
-    responses_decomposition_upper_bound: Vec<Scalar>,
-    responses_decomposition_upper_lower_bound: Vec<Scalar>,
-    // private attribute responses
-    responses_private_attributes: Vec<Scalar>,
+    responses_decomposition_lower_bound: Vec<Scalar>,
+    responses_private_attributes_lower_bound: Vec<Scalar>,
     responses_credential_blinder_lower_bound: Scalar,
+    // upper bound
+    commitments_decomposition_upper_bound: Vec<G2Projective>,
+    commitment_credential_blinder_upper_bound: G2Projective,
+    responses_decomposition_blinders_upper_bound: Vec<Scalar>,
+    responses_decomposition_upper_bound: Vec<Scalar>,
+    responses_private_attributes_upper_bound: Vec<Scalar>,
     responses_credential_blinder_upper_bound: Scalar,
 }
 
 impl RangeProof {
     pub(crate) fn construct(
+        // parameters
         params: &Parameters,
-        verification_key: &VerificationKey,
-        sp_verification_key: &VerificationKey,
-        private_attributes: &[Attribute],
         base_u: usize,
         number_of_base_elements_l: usize,
-        a: &Scalar, // lower bound
-        b: &Scalar, // upper bound
-        m_a: &Vec<Scalar>,
-        m_b: &Vec<Scalar>,
-        r_a: &Vec<Scalar>,
-        r_b: &Vec<Scalar>,
-        r1: &Scalar,
-        r2: &Scalar,
+        lower_bound: Scalar,
+        upper_bound: Scalar,
+        // keys
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+        // decompositions and blinders
+        decomposition_lower_bound: &Vec<Scalar>,
+        decomposition_upper_bound: &Vec<Scalar>,
+        decomposition_blinders_lower_bound: &Vec<Scalar>,
+        decomposition_blinders_upper_bound: &Vec<Scalar>,
+        credential_blinder_lower_bound: &Scalar,
+        credential_blinder_upper_bound: &Scalar,
+        // attributes
+        private_attributes: &Vec<Attribute>,
     ) -> Self {
         // pick random values for each witness
-        let r_m = params.n_random_scalars(private_attributes.len() - 1);
+        let random_decomposition_lower_bound = params.n_random_scalars(number_of_base_elements_l);
+        let random_decomposition_upper_bound = params.n_random_scalars(number_of_base_elements_l);
 
-        let r_m_a = params.n_random_scalars(number_of_base_elements_l);
-        let r_m_b = params.n_random_scalars(number_of_base_elements_l);
+        let random_decomposition_blinders_lower_bound =
+            params.n_random_scalars(number_of_base_elements_l);
+        let random_decomposition_blinders_upper_bound =
+            params.n_random_scalars(number_of_base_elements_l);
 
-        let r_r_a = params.n_random_scalars(number_of_base_elements_l);
-        let r_r_b = params.n_random_scalars(number_of_base_elements_l);
-        let r_r1 = params.random_scalar();
-        let r_r2 = params.random_scalar();
+        let random_credential_blinder_lower_bound = params.random_scalar();
+        let random_credential_blinder_upper_bound = params.random_scalar();
 
-        // recompute values with corresponding random values
-        let kappas_a_prime: Vec<G2Projective> = r_r_a
-            .iter()
-            .zip(r_m_a.iter())
-            .map(|(r, m)| {
-                params.gen2() * r + sp_verification_key.alpha + sp_verification_key.beta[0] * m
-            })
-            .collect();
+        let random_private_attributes_lower_bound =
+            params.n_random_scalars(private_attributes.len() - 1);
+        let random_private_attributes_upper_bound =
+            params.n_random_scalars(private_attributes.len() - 1);
 
-        let kappas_b_prime: Vec<G2Projective> = r_r_b
-            .iter()
-            .zip(r_m_b.iter())
-            .map(|(r, m)| {
-                params.gen2() * r + sp_verification_key.alpha + sp_verification_key.beta[0] * m
-            })
-            .collect();
+        // compute commitments
+        let commitments_decomposition_lower_bound: Vec<G2Projective> =
+            random_decomposition_blinders_lower_bound
+                .iter()
+                .zip(random_decomposition_lower_bound.iter())
+                .map(|(r, m)| {
+                    params.gen2() * r + sp_verification_key.alpha + sp_verification_key.beta[0] * m
+                })
+                .collect();
+
+        let commitments_decomposition_upper_bound: Vec<G2Projective> =
+            random_decomposition_blinders_upper_bound
+                .iter()
+                .zip(random_decomposition_upper_bound.iter())
+                .map(|(r, m)| {
+                    params.gen2() * r + sp_verification_key.alpha + sp_verification_key.beta[0] * m
+                })
+                .collect();
 
         let beta1 = verification_key.beta[0];
 
-        let mut kappa_a_prime: G2Projective = params.gen2() * r_r1
+        let commitment_credential_blinder_lower_bound: G2Projective = params.gen2()
+            * random_credential_blinder_lower_bound
             + verification_key.alpha
-            + beta1 * a
-            + r_m_a
+            + beta1 * lower_bound
+            + random_decomposition_lower_bound
                 .iter()
                 .enumerate()
                 .map(|(i, r_m)| beta1 * r_m * (Scalar::from((base_u as u64).pow(i as u32))))
-                .sum::<G2Projective>();
-
-        let mut kappa_b_prime: G2Projective = params.gen2() * r_r2
-            + verification_key.alpha
-            + beta1 * (b - Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32)))
-            + r_m_b
-                .iter()
-                .enumerate()
-                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((base_u as u64).pow(i as u32))))
-                .sum::<G2Projective>();
-
-        if private_attributes.len() > 1 {
-            let partial_kappa: G2Projective = r_m[1..]
+                .sum::<G2Projective>()
+            + random_private_attributes_lower_bound
                 .iter()
                 .zip(verification_key.beta[1..].iter())
                 .map(|(r_mi, beta_i)| beta_i * r_mi)
-                .sum();
+                .sum::<G2Projective>();
 
-            kappa_a_prime += partial_kappa;
-            kappa_b_prime += partial_kappa;
-        }
+        let commitment_credential_blinder_upper_bound: G2Projective = params.gen2()
+            * random_credential_blinder_upper_bound
+            + verification_key.alpha
+            + beta1
+                * (upper_bound
+                    - Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32)))
+            + random_decomposition_upper_bound
+                .iter()
+                .enumerate()
+                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((base_u as u64).pow(i as u32))))
+                .sum::<G2Projective>()
+            + random_private_attributes_upper_bound
+                .iter()
+                .zip(verification_key.beta[1..].iter())
+                .map(|(r_mi, beta_i)| beta_i * r_mi)
+                .sum::<G2Projective>();
 
-        let kappas_a_prime_bytes = kappas_a_prime
+        // compute challenge
+        let commitments_decomposition_lower_bound_bytes = commitments_decomposition_lower_bound
             .iter()
             .map(|k| k.to_bytes())
             .collect::<Vec<_>>();
 
-        let kappas_b_prime_bytes = kappas_b_prime
+        let commitments_decomposition_upper_bound_bytes = commitments_decomposition_upper_bound
             .iter()
             .map(|k| k.to_bytes())
             .collect::<Vec<_>>();
@@ -896,12 +912,24 @@ impl RangeProof {
 
         // derive challenge
         let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            kappas_a_prime_bytes
+            commitments_decomposition_lower_bound_bytes
                 .iter()
                 .map(|b| b.as_ref())
-                .chain(kappas_b_prime_bytes.iter().map(|b| b.as_ref()))
-                .chain(std::iter::once(kappa_a_prime.to_bytes().as_ref()))
-                .chain(std::iter::once(kappa_b_prime.to_bytes().as_ref()))
+                .chain(
+                    commitments_decomposition_upper_bound_bytes
+                        .iter()
+                        .map(|b| b.as_ref()),
+                )
+                .chain(std::iter::once(
+                    commitment_credential_blinder_lower_bound
+                        .to_bytes()
+                        .as_ref(),
+                ))
+                .chain(std::iter::once(
+                    commitment_credential_blinder_upper_bound
+                        .to_bytes()
+                        .as_ref(),
+                ))
                 .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
                 .chain(std::iter::once(
                     sp_verification_key.alpha.to_bytes().as_ref(),
@@ -914,32 +942,71 @@ impl RangeProof {
         );
 
         // compute responses
-        let s_m_a = produce_responses(&r_m_a, &challenge, m_a);
-        let s_m_b = produce_responses(&r_m_b, &challenge, m_b);
+        let responses_decomposition_lower_bound = produce_responses(
+            &random_decomposition_lower_bound,
+            &challenge,
+            decomposition_lower_bound,
+        );
 
-        let s_r_a = produce_responses(&r_r_a, &challenge, r_a);
-        let s_r_b = produce_responses(&r_r_b, &challenge, r_b);
+        let responses_decomposition_upper_bound = produce_responses(
+            &random_decomposition_upper_bound,
+            &challenge,
+            decomposition_upper_bound,
+        );
 
-        let s_m = produce_responses(&r_m, &challenge, &private_attributes[1..]);
-        let s_r1 = produce_response(&r_r1, &challenge, r1);
-        let s_r2 = produce_response(&r_r2, &challenge, r2);
+        let responses_decomposition_blinders_lower_bound = produce_responses(
+            &random_decomposition_blinders_lower_bound,
+            &challenge,
+            decomposition_blinders_lower_bound,
+        );
+
+        let responses_decomposition_blinders_upper_bound = produce_responses(
+            &random_decomposition_blinders_upper_bound,
+            &challenge,
+            decomposition_blinders_upper_bound,
+        );
+
+        let responses_private_attributes_lower_bound = produce_responses(
+            &random_private_attributes_lower_bound,
+            &challenge,
+            &private_attributes[1..],
+        );
+        let responses_private_attributes_upper_bound = produce_responses(
+            &random_private_attributes_upper_bound[1..],
+            &challenge,
+            &private_attributes[1..],
+        );
+        let responses_credential_blinder_lower_bound = produce_response(
+            &random_credential_blinder_lower_bound,
+            &challenge,
+            credential_blinder_lower_bound,
+        );
+        let responses_credential_blinder_upper_bound = produce_response(
+            &random_credential_blinder_upper_bound,
+            &challenge,
+            credential_blinder_upper_bound,
+        );
 
         RangeProof {
+            // parameters
             base_u,
             number_of_base_elements_l,
-            a: *a,
-            b: *b,
-            kappas_a_prime,
-            kappas_b_prime,
-            kappa_a_prime,
-            kappa_b_prime,
-            s_m_a,
-            s_m_b,
-            s_r_a,
-            s_r_b,
-            s_m,
-            s_r1,
-            s_r2,
+            lower_bound,
+            upper_bound,
+            // lower bound
+            commitments_decomposition_lower_bound,
+            commitment_credential_blinder_lower_bound,
+            responses_decomposition_blinders_lower_bound,
+            responses_decomposition_lower_bound,
+            responses_private_attributes_lower_bound,
+            responses_credential_blinder_lower_bound,
+            // upper bound
+            commitments_decomposition_upper_bound,
+            commitment_credential_blinder_upper_bound,
+            responses_decomposition_blinders_upper_bound,
+            responses_decomposition_upper_bound,
+            responses_private_attributes_upper_bound,
+            responses_credential_blinder_upper_bound,
         }
     }
 
