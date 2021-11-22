@@ -599,26 +599,12 @@ impl SetMembershipProof {
                 .sum::<G2Projective>();
 
         // compute challenge
-        let beta_bytes = verification_key
-            .beta
-            .iter()
-            .map(|beta_i| beta_i.to_bytes())
-            .collect::<Vec<_>>();
-
-        let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            std::iter::once(commitment_element_kappa.to_bytes().as_ref())
-                .chain(std::iter::once(
-                    commitment_credential_kappa.to_bytes().as_ref(),
-                ))
-                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
-                .chain(std::iter::once(
-                    sp_verification_key.alpha.to_bytes().as_ref(),
-                ))
-                .chain(std::iter::once(
-                    sp_verification_key.beta[0].to_bytes().as_ref(),
-                ))
-                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(beta_bytes.iter().map(|b| b.as_ref())),
+        let challenge = SetMembershipProof::compute_challenge(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &commitment_element_kappa,
+            &commitment_credential_kappa,
         );
 
         // responses
@@ -645,25 +631,23 @@ impl SetMembershipProof {
         self.responses_private_attributes.len()
     }
 
-    pub(crate) fn verify(
-        &self,
+    fn compute_challenge(
         params: &Parameters,
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
-        kappa_1: &G2Projective,
-        kappa_2: &G2Projective,
-    ) -> bool {
+        commitment_element_kappa: &G2Projective,
+        commitment_credential_kappa: &G2Projective,
+    ) -> Scalar {
         let beta_bytes = verification_key
             .beta
             .iter()
             .map(|beta_i| beta_i.to_bytes())
             .collect::<Vec<_>>();
 
-        // recompute challenge: H(kappa_1', kappa_2', g2, alpha_P, beta_P, alpha, betas)
-        let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            std::iter::once(self.commitment_element_kappa.to_bytes().as_ref())
+        compute_challenge::<ChallengeDigest, _, _>(
+            std::iter::once(commitment_element_kappa.to_bytes().as_ref())
                 .chain(std::iter::once(
-                    self.commitment_credential_kappa.to_bytes().as_ref(),
+                    commitment_credential_kappa.to_bytes().as_ref(),
                 ))
                 .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
                 .chain(std::iter::once(
@@ -674,7 +658,33 @@ impl SetMembershipProof {
                 ))
                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
                 .chain(beta_bytes.iter().map(|b| b.as_ref())),
-        );
+        )
+    }
+
+    fn recompute_challenge(
+        &self,
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+    ) -> Scalar {
+        SetMembershipProof::compute_challenge(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &self.commitment_element_kappa,
+            &self.commitment_credential_kappa,
+        )
+    }
+
+    pub(crate) fn verify(
+        &self,
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+        kappa_1: &G2Projective,
+        kappa_2: &G2Projective,
+    ) -> bool {
+        let challenge = self.recompute_challenge(&params, &verification_key, &sp_verification_key);
 
         let kappa_1_lhs =
             sp_verification_key.alpha * (-Scalar::one()) + self.commitment_element_kappa;
