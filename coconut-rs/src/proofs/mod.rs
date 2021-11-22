@@ -560,52 +560,56 @@ impl ProofKappaNu {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct SetMembershipProof {
-    challenge: Scalar, // to remove later after testing
-    kappa_1_prime: G2Projective,
-    kappa_2_prime: G2Projective,
-    s_mi: Vec<Scalar>,
-    s_r1: Scalar,
-    s_r2: Scalar,
+    commitment_element_kappa: G2Projective,
+    commitment_credential_kappa: G2Projective,
+    response_element_blinder: Scalar,
+    response_credential_blinder: Scalar,
+    responses_private_attributes: Vec<Scalar>,
 }
 
 impl SetMembershipProof {
     pub(crate) fn construct(
+        // parameters
         params: &Parameters,
+        // keys
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
-        private_attributes: &[Attribute],
-        r1: &Scalar,
-        r2: &Scalar,
+        // element and credential blinders
+        element_blinder: &Scalar,
+        credential_blinder: &Scalar,
+        // private attributes
+        private_attributes: &Vec<Attribute>,
     ) -> Self {
-        // pick random witnesses
-        let r_r1 = params.random_scalar();
-        let r_r2 = params.random_scalar();
-        let r_mi = params.n_random_scalars(private_attributes.len());
+        // pick random values for each witness
+        let random_element_blinder = params.random_scalar();
+        let random_credential_blinder = params.random_scalar();
+        let random_private_attributes = params.n_random_scalars(private_attributes.len());
 
-        // kappa_1' = g2 * r_r1 + alpha_P + beta_P * r_mi[0]
-        let kappa_1_prime = params.gen2() * r_r1
+        // compute commitments
+        let commitment_element_kappa = params.gen2() * random_element_blinder
             + sp_verification_key.alpha
-            + sp_verification_key.beta[0] * r_mi[0];
+            + sp_verification_key.beta[0] * random_private_attributes[0];
 
-        // kappa_2' = g2 * r_r2 + alpha + beta[0] * r_mi[0] + ... + beta[i] * r_mi[i]
-        let kappa_2_prime = params.gen2() * r_r2
+        let commitment_credential_kappa = params.gen2() * random_credential_blinder
             + verification_key.alpha
-            + r_mi
+            + random_private_attributes
                 .iter()
                 .zip(verification_key.beta.iter())
-                .map(|(r_mi, beta_i)| beta_i * r_mi)
+                .map(|(rpa_i, beta_i)| beta_i * rpa_i)
                 .sum::<G2Projective>();
 
+        // compute challenge
         let beta_bytes = verification_key
             .beta
             .iter()
             .map(|beta_i| beta_i.to_bytes())
             .collect::<Vec<_>>();
 
-        // compute challenge: H(kappa_1', kappa_2', g2, alpha_P, beta_P, alpha, betas)
         let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            std::iter::once(kappa_1_prime.to_bytes().as_ref())
-                .chain(std::iter::once(kappa_2_prime.to_bytes().as_ref()))
+            std::iter::once(commitment_element_kappa.to_bytes().as_ref())
+                .chain(std::iter::once(
+                    commitment_credential_kappa.to_bytes().as_ref(),
+                ))
                 .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
                 .chain(std::iter::once(
                     sp_verification_key.alpha.to_bytes().as_ref(),
@@ -618,22 +622,27 @@ impl SetMembershipProof {
         );
 
         // responses
-        let s_r1 = produce_response(&r_r1, &challenge, &r1);
-        let s_r2 = produce_response(&r_r2, &challenge, &r2);
-        let s_mi = produce_responses(&r_mi, &challenge, private_attributes);
+        let response_element_blinder =
+            produce_response(&random_element_blinder, &challenge, &random_element_blinder);
+        let response_credential_blinder = produce_response(
+            &random_credential_blinder,
+            &challenge,
+            &random_credential_blinder,
+        );
+        let responses_private_attributes =
+            produce_responses(&random_private_attributes, &challenge, private_attributes);
 
         SetMembershipProof {
-            challenge,
-            kappa_1_prime,
-            kappa_2_prime,
-            s_mi,
-            s_r1,
-            s_r2,
+            commitment_element_kappa,
+            commitment_credential_kappa,
+            response_element_blinder,
+            response_credential_blinder,
+            responses_private_attributes,
         }
     }
 
     pub(crate) fn private_attributes(&self) -> usize {
-        self.s_mi.len()
+        self.responses_private_attributes.len()
     }
 
     pub(crate) fn verify(
@@ -652,8 +661,10 @@ impl SetMembershipProof {
 
         // recompute challenge: H(kappa_1', kappa_2', g2, alpha_P, beta_P, alpha, betas)
         let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            std::iter::once(self.kappa_1_prime.to_bytes().as_ref())
-                .chain(std::iter::once(self.kappa_2_prime.to_bytes().as_ref()))
+            std::iter::once(self.commitment_element_kappa.to_bytes().as_ref())
+                .chain(std::iter::once(
+                    self.commitment_credential_kappa.to_bytes().as_ref(),
+                ))
                 .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
                 .chain(std::iter::once(
                     sp_verification_key.alpha.to_bytes().as_ref(),
@@ -665,15 +676,14 @@ impl SetMembershipProof {
                 .chain(beta_bytes.iter().map(|b| b.as_ref())),
         );
 
-        // to remove after test
-        assert_eq!(challenge, self.challenge);
-
-        let kappa_1_lhs = sp_verification_key.alpha * (-Scalar::one()) + self.kappa_1_prime;
+        let kappa_1_lhs =
+            sp_verification_key.alpha * (-Scalar::one()) + self.commitment_element_kappa;
         let kappa_1_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_1) * challenge
             + params.gen2() * self.s_r1
             + sp_verification_key.beta[0] * self.s_mi[0];
 
-        let kappa_2_lhs = verification_key.alpha * (-Scalar::one()) + self.kappa_2_prime;
+        let kappa_2_lhs =
+            verification_key.alpha * (-Scalar::one()) + self.commitment_credential_kappa;
         let kappa_2_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_2) * challenge
             + params.gen2() * self.s_r2
             + verification_key
@@ -686,7 +696,7 @@ impl SetMembershipProof {
         kappa_1_lhs == kappa_1_rhs && kappa_2_lhs == kappa_2_rhs
     }
 
-    // kappa_1_prime || kappa_2_prime || s_mi.len() || s_mi || s_r1 || s_r2 || challenge
+    // commitment_element_kappa || commitment_credential_kappa || s_mi.len() || s_mi || s_r1 || s_r2 || challenge
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let total_size = 2 * G2PCOMPRESSED_SIZE
             + USIZE_SIZE
@@ -696,8 +706,8 @@ impl SetMembershipProof {
 
         let mut bytes = Vec::with_capacity(total_size);
 
-        bytes.extend_from_slice(&self.kappa_1_prime.to_affine().to_compressed());
-        bytes.extend_from_slice(&self.kappa_2_prime.to_affine().to_compressed());
+        bytes.extend_from_slice(&self.commitment_element_kappa.to_affine().to_compressed());
+        bytes.extend_from_slice(&self.commitment_credential_kappa.to_affine().to_compressed());
 
         bytes.extend_from_slice(&self.s_mi.len().to_le_bytes());
         for s_mi in &self.s_mi {
@@ -729,7 +739,7 @@ impl SetMembershipProof {
         let kappa_1_prime_bytes = bytes[..G2PCOMPRESSED_SIZE].try_into().unwrap();
         let mut p = G2PCOMPRESSED_SIZE;
 
-        let kappa_1_prime = try_deserialize_g2_projective(
+        let commitment_element_kappa = try_deserialize_g2_projective(
             &kappa_1_prime_bytes,
             CoconutError::Deserialization("failed to deserialize kappa_1'".to_string()),
         )?;
@@ -737,7 +747,7 @@ impl SetMembershipProof {
         let kappa_2_prime_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
         p += G2PCOMPRESSED_SIZE;
 
-        let kappa_2_prime = try_deserialize_g2_projective(
+        let commitment_credential_kappa = try_deserialize_g2_projective(
             &kappa_2_prime_bytes,
             CoconutError::Deserialization("failed to deserialize kappa_2'".to_string()),
         )?;
@@ -778,8 +788,8 @@ impl SetMembershipProof {
 
         Ok(SetMembershipProof {
             challenge,
-            kappa_1_prime,
-            kappa_2_prime,
+            commitment_element_kappa,
+            commitment_credential_kappa,
             s_mi,
             s_r1,
             s_r2,
@@ -831,7 +841,7 @@ impl RangeProof {
         decomposition_upper_bound: &Vec<Scalar>,
         decomposition_blinders_upper_bound: &Vec<Scalar>,
         credential_blinder_upper_bound: &Scalar,
-        // attributes
+        // private attributes
         private_attributes: &Vec<Attribute>,
     ) -> Self {
         // pick random values for each witness
@@ -921,7 +931,6 @@ impl RangeProof {
             .map(|b| b.to_bytes())
             .collect::<Vec<_>>();
 
-        // derive challenge
         let challenge = compute_challenge::<ChallengeDigest, _, _>(
             commitments_decomposition_lower_bound_bytes
                 .iter()

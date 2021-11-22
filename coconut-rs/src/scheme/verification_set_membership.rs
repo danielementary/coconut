@@ -72,12 +72,12 @@ impl SetMembershipTheta {
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
     ) -> bool {
-        self.pi.verify(
+        self.nizkp.verify(
             params,
             verification_key,
             sp_verification_key,
-            &self.kappa_1,
-            &self.kappa_2,
+            &self.element_kappa,
+            &self.credential_kappa,
         )
     }
 
