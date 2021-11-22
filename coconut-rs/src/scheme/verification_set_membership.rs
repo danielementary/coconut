@@ -26,6 +26,7 @@ use crate::scheme::{Signature, VerificationKey};
 use crate::traits::{Base58, Bytable};
 use crate::utils::{
     deserialize_g2_projective, deserialize_set_membership_proof, deserialize_signature,
+    serialize_g2_projective, serialize_set_membership_proof, serialize_signature,
 };
 use crate::Attribute;
 
@@ -81,25 +82,13 @@ impl SetMembershipTheta {
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let kappa_1_bytes = self.kappa_1.to_affine().to_compressed();
-        let a_prime_bytes = self.a_prime.to_bytes();
-        let kappa_2_bytes = self.kappa_2.to_affine().to_compressed();
-        let sigma_prime_bytes = self.sigma_prime.to_bytes();
-        let pi_bytes = self.pi.to_bytes();
+        let mut bytes = Vec::new();
 
-        let mut bytes = Vec::with_capacity(
-            kappa_1_bytes.len()
-                + a_prime_bytes.len()
-                + kappa_2_bytes.len()
-                + sigma_prime_bytes.len()
-                + pi_bytes.len(),
-        );
-
-        bytes.extend_from_slice(&kappa_1_bytes);
-        bytes.extend_from_slice(&a_prime_bytes);
-        bytes.extend_from_slice(&kappa_2_bytes);
-        bytes.extend_from_slice(&sigma_prime_bytes);
-        bytes.extend_from_slice(&pi_bytes);
+        serialize_signature(&self.element_randomized_signature, &mut bytes);
+        serialize_g2_projective(&self.element_kappa, &mut bytes);
+        serialize_signature(&self.credential_randomized_signature, &mut bytes);
+        serialize_g2_projective(&self.credential_kappa, &mut bytes);
+        serialize_set_membership_proof(&self.nizkp, &mut bytes);
 
         bytes
     }
