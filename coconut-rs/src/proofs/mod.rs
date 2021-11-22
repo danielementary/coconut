@@ -638,12 +638,6 @@ impl SetMembershipProof {
         commitment_element_kappa: &G2Projective,
         commitment_credential_kappa: &G2Projective,
     ) -> Scalar {
-        let beta_bytes = verification_key
-            .beta
-            .iter()
-            .map(|beta_i| beta_i.to_bytes())
-            .collect::<Vec<_>>();
-
         compute_challenge::<ChallengeDigest, _, _>(
             std::iter::once(commitment_element_kappa.to_bytes().as_ref())
                 .chain(std::iter::once(
@@ -657,7 +651,7 @@ impl SetMembershipProof {
                     sp_verification_key.beta[0].to_bytes().as_ref(),
                 ))
                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(beta_bytes.iter().map(|b| b.as_ref())),
+                .chain(verification_key.beta.iter().map(|b| b.to_bytes().as_ref())),
         )
     }
 
@@ -689,24 +683,23 @@ impl SetMembershipProof {
         let kappa_1_lhs =
             sp_verification_key.alpha * (-Scalar::one()) + self.commitment_element_kappa;
         let kappa_1_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_1) * challenge
-            + params.gen2() * self.s_r1
-            + sp_verification_key.beta[0] * self.s_mi[0];
+            + params.gen2() * self.response_element_blinder
+            + sp_verification_key.beta[0] * self.responses_private_attributes[0];
 
         let kappa_2_lhs =
             verification_key.alpha * (-Scalar::one()) + self.commitment_credential_kappa;
         let kappa_2_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_2) * challenge
-            + params.gen2() * self.s_r2
+            + params.gen2() * self.response_credential_blinder
             + verification_key
                 .beta
                 .iter()
-                .zip(self.s_mi.iter())
+                .zip(self.responses_private_attributes.iter())
                 .map(|(beta, s_m)| beta * s_m)
                 .sum::<G2Projective>();
 
         kappa_1_lhs == kappa_1_rhs && kappa_2_lhs == kappa_2_rhs
     }
 
-    // commitment_element_kappa || commitment_credential_kappa || s_mi.len() || s_mi || s_r1 || s_r2 || challenge
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let total_size = 2 * G2PCOMPRESSED_SIZE
             + USIZE_SIZE
