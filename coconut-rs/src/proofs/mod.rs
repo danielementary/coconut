@@ -701,101 +701,37 @@ impl SetMembershipProof {
     }
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        let total_size = 2 * G2PCOMPRESSED_SIZE
-            + USIZE_SIZE
-            + self.s_mi.len() * SCALAR_SIZE
-            + 2 * SCALAR_SIZE
-            + SCALAR_SIZE;
+        let bytes = Vec::new();
 
-        let mut bytes = Vec::with_capacity(total_size);
+        serialize_usize(&self.private_attributes(), &mut bytes);
 
-        bytes.extend_from_slice(&self.commitment_element_kappa.to_affine().to_compressed());
-        bytes.extend_from_slice(&self.commitment_credential_kappa.to_affine().to_compressed());
-
-        bytes.extend_from_slice(&self.s_mi.len().to_le_bytes());
-        for s_mi in &self.s_mi {
-            bytes.extend_from_slice(&s_mi.to_bytes());
-        }
-
-        bytes.extend_from_slice(&self.s_r1.to_bytes());
-        bytes.extend_from_slice(&self.s_r2.to_bytes());
-
-        bytes.extend_from_slice(&self.challenge.to_bytes());
+        serialize_g2_projective(&self.commitment_element_kappa, &mut bytes);
+        serialize_g2_projective(&self.commitment_credential_kappa, &mut bytes);
+        serialize_scalar(&self.response_element_blinder, &mut bytes);
+        serialize_scalar(&self.response_credential_blinder, &mut bytes);
+        serialize_scalars(&self.responses_private_attributes, &mut bytes);
 
         bytes
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let min_size =
-            2 * G2PCOMPRESSED_SIZE + USIZE_SIZE + SCALAR_SIZE + 2 * SCALAR_SIZE + SCALAR_SIZE;
+        let mut pointer = 0;
 
-        if bytes.len() < min_size || (bytes.len() - min_size) % SCALAR_SIZE != 0 {
-            return Err(CoconutError::DeserializationInvalidLength {
-                actual: bytes.len(),
-                modulus_target: bytes.len() - min_size,
-                modulus: SCALAR_SIZE,
-                object: "kappa_1', kappa_2', s_mi, s_r1, s_r2".to_string(),
-                target: min_size,
-            });
-        }
+        let private_attributes_len = deserialize_usize(&bytes, &mut pointer);
 
-        let kappa_1_prime_bytes = bytes[..G2PCOMPRESSED_SIZE].try_into().unwrap();
-        let mut p = G2PCOMPRESSED_SIZE;
-
-        let commitment_element_kappa = try_deserialize_g2_projective(
-            &kappa_1_prime_bytes,
-            CoconutError::Deserialization("failed to deserialize kappa_1'".to_string()),
-        )?;
-
-        let kappa_2_prime_bytes = bytes[p..p + G2PCOMPRESSED_SIZE].try_into().unwrap();
-        p += G2PCOMPRESSED_SIZE;
-
-        let commitment_credential_kappa = try_deserialize_g2_projective(
-            &kappa_2_prime_bytes,
-            CoconutError::Deserialization("failed to deserialize kappa_2'".to_string()),
-        )?;
-
-        let s_mi_len = u64::from_le_bytes(bytes[p..p + USIZE_SIZE].try_into().unwrap());
-        p += USIZE_SIZE;
-
-        let p_temp = p + (s_mi_len as usize) * SCALAR_SIZE;
-        let s_mi = try_deserialize_scalar_vec(
-            s_mi_len,
-            &bytes[p..p_temp],
-            CoconutError::Deserialization("Failed to deserialize s_mi".to_string()),
-        )?;
-        p = p_temp;
-
-        let s_r1_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
-        p += SCALAR_SIZE;
-
-        let s_r1 = try_deserialize_scalar(
-            &s_r1_bytes,
-            CoconutError::Deserialization("failed to deserialize the s_r1".to_string()),
-        )?;
-
-        let s_r2_bytes = bytes[p..p + SCALAR_SIZE].try_into().unwrap();
-        p += SCALAR_SIZE;
-
-        let s_r2 = try_deserialize_scalar(
-            &s_r2_bytes,
-            CoconutError::Deserialization("failed to deserialize the s_r2".to_string()),
-        )?;
-
-        let challenge_bytes = bytes[p..].try_into().unwrap();
-
-        let challenge = try_deserialize_scalar(
-            &challenge_bytes,
-            CoconutError::Deserialization("failed to deserialize the challenge".to_string()),
-        )?;
+        let commitment_element_kappa = deserialize_g2_projective(&bytes, &mut pointer);
+        let commitment_credential_kappa = deserialize_g2_projective(&bytes, &mut pointer);
+        let response_element_blinder = deserialize_scalar(&bytes, &mut pointer);
+        let response_credential_blinder = deserialize_scalar(&bytes, &mut pointer);
+        let responses_private_attributes =
+            deserialize_scalars(&bytes, &mut pointer, private_attributes_len);
 
         Ok(SetMembershipProof {
-            challenge,
             commitment_element_kappa,
             commitment_credential_kappa,
-            s_mi,
-            s_r1,
-            s_r2,
+            response_element_blinder,
+            response_credential_blinder,
+            responses_private_attributes,
         })
     }
 }
