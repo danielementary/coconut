@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::convert::TryFrom;
-use std::convert::TryInto;
 
 use bls12_381::{G2Prepared, G2Projective};
 use group::Curve;
@@ -25,7 +24,9 @@ use crate::scheme::setup::Parameters;
 use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
 use crate::scheme::{Signature, VerificationKey};
 use crate::traits::{Base58, Bytable};
-use crate::utils::try_deserialize_g2_projective;
+use crate::utils::{
+    deserialize_g2_projective, deserialize_set_membership_proof, deserialize_signature,
+};
 use crate::Attribute;
 
 #[derive(Debug)]
@@ -45,37 +46,20 @@ impl TryFrom<&[u8]> for SetMembershipTheta {
     type Error = CoconutError;
 
     fn try_from(bytes: &[u8]) -> Result<SetMembershipTheta> {
-        if bytes.len() < 384 {
-            return Err(
-                CoconutError::Deserialization(
-                    format!("Tried to deserialize theta with insufficient number of bytes, expected >= 384, got {}", bytes.len()),
-                ));
-        }
+        let mut pointer = 0;
 
-        let kappa_1_bytes = bytes[..96].try_into().unwrap();
-        let kappa_1 = try_deserialize_g2_projective(
-            &kappa_1_bytes,
-            CoconutError::Deserialization("failed to deserialize kappa_1".to_string()),
-        )?;
-
-        let a_prime = Signature::try_from(&bytes[96..192])?;
-
-        let kappa_2_bytes = bytes[192..288].try_into().unwrap();
-        let kappa_2 = try_deserialize_g2_projective(
-            &kappa_2_bytes,
-            CoconutError::Deserialization("failed to deserialize kappa_2".to_string()),
-        )?;
-
-        let sigma_prime = Signature::try_from(&bytes[288..384])?;
-
-        let pi = SetMembershipProof::from_bytes(&bytes[384..])?;
+        let element_randomized_signature = deserialize_signature(&bytes, &mut pointer);
+        let element_kappa = deserialize_g2_projective(&bytes, &mut pointer);
+        let credential_randomized_signature = deserialize_signature(&bytes, &mut pointer);
+        let credential_kappa = deserialize_g2_projective(&bytes, &mut pointer);
+        let nizkp = deserialize_set_membership_proof(&bytes, &mut pointer);
 
         Ok(SetMembershipTheta {
-            kappa_1,
-            a_prime,
-            kappa_2,
-            sigma_prime,
-            pi,
+            element_randomized_signature,
+            element_kappa,
+            credential_randomized_signature,
+            credential_kappa,
+            nizkp,
         })
     }
 }

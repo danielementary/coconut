@@ -34,7 +34,7 @@ use crate::error::{CoconutError, Result};
 use crate::scheme::setup::Parameters;
 use crate::scheme::{SecretKey, Signature, SignerIndex};
 
-use crate::proofs::RangeProof;
+use crate::proofs::{RangeProof, SetMembershipProof};
 
 // default type size for serialization
 pub const G2PCOMPRESSED_SIZE: usize = 96;
@@ -350,7 +350,15 @@ pub fn deserialize_g2_projectives(
         .collect()
 }
 
-pub fn serialize_proof(p: &RangeProof, bytes: &mut Vec<u8>) {
+pub fn serialize_set_membership_proof(p: &SetMembershipProof, bytes: &mut Vec<u8>) {
+    bytes.extend_from_slice(&p.to_bytes());
+}
+
+pub fn deserialize_set_membership_proof(bytes: &[u8], pointer: &mut usize) -> SetMembershipProof {
+    SetMembershipProof::from_bytes(&bytes[*pointer..]).unwrap()
+}
+
+pub fn serialize_range_proof(p: &RangeProof, bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&p.to_bytes());
 }
 

@@ -30,7 +30,7 @@ use crate::utils::{
     compute_u_ary_decomposition, deserialize_g2_projective, deserialize_g2_projectives,
     deserialize_range_proof, deserialize_scalar, deserialize_signature, deserialize_signatures,
     deserialize_usize, pick_signatures_for_decomposition, scalar_to_u64, serialize_g2_projective,
-    serialize_g2_projectives, serialize_proof, serialize_scalar, serialize_signature,
+    serialize_g2_projectives, serialize_range_proof, serialize_scalar, serialize_signature,
     serialize_signatures, serialize_usize, ServiceProviderSignatures,
 };
 
@@ -43,7 +43,7 @@ pub struct RangeTheta {
     number_of_base_elements_l: usize,
     lower_bound: Scalar,
     upper_bound: Scalar,
-    // "randomized" signatures for decomposition and decomposition
+    // "randomized" signatures for decomposition and credential
     // and corresponding material to verify randomization
     // for lower bound and upper bound check
     // lower bound
@@ -148,7 +148,7 @@ impl RangeTheta {
         serialize_signature(&self.randomized_credential_upper_bound, &mut bytes);
         serialize_g2_projective(&self.credential_kappa_upper_bound, &mut bytes);
 
-        serialize_proof(&self.nizkp, &mut bytes);
+        serialize_range_proof(&self.nizkp, &mut bytes);
 
         bytes
     }
