@@ -21,11 +21,11 @@ use group::Curve;
 use crate::error::{CoconutError, Result};
 use crate::proofs::SetMembershipProof;
 
-use crate::scheme::Signature;
-use crate::scheme::VerificationKey;
+use crate::scheme::setup::Parameters;
+use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
+use crate::scheme::{Signature, VerificationKey};
 use crate::traits::{Base58, Bytable};
 use crate::utils::try_deserialize_g2_projective;
-use crate::utils::RawAttribute;
 use crate::Attribute;
 
 #[derive(Debug)]
@@ -229,83 +229,10 @@ pub fn verify_set_membership_credential(
 
 #[cfg(test)]
 mod tests {
-    use crate::scheme::keygen::keygen;
+    use crate::scheme::keygen::{keygen, single_attribute_keygen};
     use crate::scheme::setup::setup;
-    use crate::scheme::verification::check_bilinear_pairing;
 
     use super::*;
-
-    #[test]
-    fn issue_membership_signatures_len() {
-        let params = setup(1).unwrap();
-
-        let set_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
-        let membership_signatures_2 = issue_membership_signatures(&params, &set_2);
-
-        let set_3 = [
-            RawAttribute::Number(0),
-            RawAttribute::Number(1),
-            RawAttribute::Number(2),
-        ];
-        let membership_signatures_3 = issue_membership_signatures(&params, &set_3);
-
-        assert_eq!(set_2.len(), membership_signatures_2.signatures.len());
-        assert_eq!(set_3.len(), membership_signatures_3.signatures.len());
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "set must contain at least 2 distinct attributes to issue signatures"
-    )]
-    fn issue_membership_signatures_empty_set() {
-        let params = setup(1).unwrap();
-
-        let set_0 = [];
-        issue_membership_signatures(&params, &set_0);
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "set must contain at least 2 distinct attributes to issue signatures"
-    )]
-    fn issue_membership_signatures_small_set() {
-        let params = setup(1).unwrap();
-
-        let set_1 = [RawAttribute::Number(0)];
-        issue_membership_signatures(&params, &set_1);
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "set must contain at least 2 distinct attributes to issue signatures"
-    )]
-    fn issue_membership_signatures_small_set_dup() {
-        let params = setup(1).unwrap();
-
-        let set_2_dup = [RawAttribute::Number(0), RawAttribute::Number(0)];
-        issue_membership_signatures(&params, &set_2_dup);
-    }
-
-    #[test]
-    fn issue_membership_signatures_valid() {
-        let params = setup(1).unwrap();
-
-        let set_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
-        let membership_signatures_2 = issue_membership_signatures(&params, &set_2);
-        let sp_verification_key = membership_signatures_2.sp_verification_key;
-
-        for (m, Signature(s1, s2)) in membership_signatures_2.signatures.iter() {
-            let abm = sp_verification_key.alpha
-                + sp_verification_key.beta[0] * (Attribute::from(m.clone()));
-
-            assert!(check_bilinear_pairing(
-                &s1.to_affine(),
-                &G2Prepared::from(abm.to_affine()),
-                &s2.to_affine(),
-                params.prepared_miller_g2(),
-            ));
-        }
-    }
 
     #[test]
     fn set_membership_theta_bytes_roundtrip_1() {

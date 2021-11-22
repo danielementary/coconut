@@ -22,17 +22,16 @@ use crate::proofs::RangeProof;
 
 use crate::scheme::setup::Parameters;
 use crate::scheme::verification::{check_bilinear_pairing, compute_kappa};
-use crate::scheme::verification_set_membership::{issue_membership_signatures, SpSignatures};
 use crate::scheme::{Signature, VerificationKey};
 
 use crate::traits::{Base58, Bytable};
 
-use crate::utils::RawAttribute;
 use crate::utils::{
-    deserialize_g2_projective, deserialize_g2_projectives, deserialize_range_proof,
-    deserialize_scalar, deserialize_signature, deserialize_signatures, deserialize_usize,
-    serialize_g2_projective, serialize_g2_projectives, serialize_proof, serialize_scalar,
-    serialize_signature, serialize_signatures, serialize_usize,
+    compute_u_ary_decomposition, deserialize_g2_projective, deserialize_g2_projectives,
+    deserialize_range_proof, deserialize_scalar, deserialize_signature, deserialize_signatures,
+    deserialize_usize, pick_signatures_for_decomposition, scalar_to_u64, serialize_g2_projective,
+    serialize_g2_projectives, serialize_proof, serialize_scalar, serialize_signature,
+    serialize_signatures, serialize_usize, ServiceProviderSignatures,
 };
 
 use crate::Attribute;
@@ -171,106 +170,6 @@ impl Bytable for RangeTheta {
 
 impl Base58 for RangeTheta {}
 
-pub fn issue_range_signatures(params: &Parameters) -> SpSignatures {
-    // TODO: remove U and L
-    const U: usize = 4;
-
-    let set: Vec<usize> = (0..U).collect();
-    let set: Vec<RawAttribute> = set
-        .iter()
-        .map(|e| RawAttribute::Number(*e as u64))
-        .collect();
-
-    issue_membership_signatures(params, &set[..])
-}
-
-fn scalar_fits_in_u64(number: &Scalar) -> bool {
-    let bytes = number.to_bytes();
-
-    // check that only first 64 bits are set
-    for byte in bytes[8..].iter() {
-        if *byte != 0 {
-            return false;
-        }
-    }
-
-    true
-}
-
-fn scalar_to_u64(number: &Scalar) -> u64 {
-    if !scalar_fits_in_u64(&number) {
-        panic!("This scalar does not fit in u64");
-    }
-
-    // keep 8 first bytes ~= 64 first bits for u64
-    let mut u64_bytes: [u8; 8] = [0; 8];
-    let number_bytes = number.to_bytes();
-
-    u64_bytes.clone_from_slice(&number_bytes[..8]);
-
-    u64::from_le_bytes(u64_bytes)
-}
-
-pub fn compute_u_ary_decomposition(
-    number: &Scalar,
-    base_u: usize,
-    number_of_base_elements_l: usize,
-) -> Vec<Scalar> {
-    // these casts are necessary to compute powers and divisions
-    // may panic if number does not fit in u64
-    // or if number_of_base_elements_l doest not fit in u32
-    // but this should usually not happen
-    let number = scalar_to_u64(&number);
-    let base_u = u64::try_from(base_u).unwrap();
-    let number_of_base_elements_l = u32::try_from(number_of_base_elements_l).unwrap();
-
-    // the decomposition can only be computed for numbers in [0, base_u^number_of_base_elements_l)
-    // otherwise it panics
-    let upper_bound = base_u.pow(number_of_base_elements_l);
-    if upper_bound <= number {
-        panic!("this number is out of range to compute {}-ary decomposition on {} base elements ([0, {})).", base_u, number_of_base_elements_l, upper_bound);
-    }
-
-    let mut decomposition: Vec<Scalar> = Vec::new();
-    let mut remainder = number;
-
-    for i in (0..number_of_base_elements_l).rev() {
-        let i_th_pow = base_u.pow(i);
-        let i_th_base_element = remainder / i_th_pow;
-
-        decomposition.push(Scalar::from(i_th_base_element));
-        remainder %= i_th_pow;
-    }
-
-    // make sure that returned vec has actually number_of_base_elements_l elements"
-    let number_of_base_elements_l = usize::try_from(number_of_base_elements_l).unwrap();
-    assert_eq!(number_of_base_elements_l, decomposition.len());
-
-    // decomposition is little endian: base_u^0 | base_u^1 | ... | base_u^(number_of_base_elements_l - 1)
-    decomposition.reverse();
-    decomposition
-}
-
-fn pick_signature_for_base_element(
-    m: &Scalar,
-    signatures: &HashMap<RawAttribute, Signature>,
-) -> Signature {
-    signatures
-        .get(&RawAttribute::Number(scalar_to_u64(m)))
-        .unwrap()
-        .clone()
-}
-
-pub fn pick_signatures_for_decomposition(
-    decomposition: &Vec<Scalar>,
-    signatures: &HashMap<RawAttribute, Signature>,
-) -> Vec<Signature> {
-    decomposition
-        .iter()
-        .map(|base_elements_i| pick_signature_for_base_element(base_elements_i, signatures))
-        .collect()
-}
-
 pub fn prove_credential_and_range(
     // parameters
     params: &Parameters,
@@ -283,7 +182,7 @@ pub fn prove_credential_and_range(
     sp_verification_key: &VerificationKey,
     // signatures
     credential: &Signature,
-    sp_signatures: &HashMap<RawAttribute, Signature>,
+    sp_signatures: &ServiceProviderSignatures,
     // attributes
     private_attributes: &Vec<Attribute>,
 ) -> Result<RangeTheta> {
@@ -306,7 +205,6 @@ pub fn prove_credential_and_range(
     // use first private attribute for range proof
     let private_attribute_for_proof = private_attributes[0];
 
-    // TODO: turn this into a function
     // lower bound run
     let decomposition_lower_bound = compute_u_ary_decomposition(
         &(private_attribute_for_proof - lower_bound),
@@ -386,15 +284,15 @@ pub fn prove_credential_and_range(
         number_of_base_elements_l,
         lower_bound,
         upper_bound,
-        verification_key,
-        sp_verification_key,
+        &verification_key,
+        &sp_verification_key,
         &decomposition_lower_bound,
         &decomposition_blinders_lower_bound,
         &credential_blinder_lower_bound,
         &decomposition_upper_bound,
         &decomposition_blinders_upper_bound,
         &credential_blinder_upper_bound,
-        private_attributes,
+        &private_attributes,
     );
 
     Ok(RangeTheta {
@@ -492,134 +390,23 @@ pub fn verify_range_credential(
 
 #[cfg(test)]
 mod tests {
-    use crate::scheme::keygen::keygen;
+    use crate::scheme::keygen::{keygen, single_attribute_keygen};
     use crate::scheme::setup::setup;
+    use crate::utils::issue_range_signatures;
 
     use super::*;
 
     // tests are performed for base u and 8 base elements
     const U: usize = 4;
     const L: usize = 8;
-    const MAX: u64 = (U as u64).pow(L as u32);
-
-    #[test]
-    fn compute_u_ary_decomposition_scalar_fits_in_u64_tests() {
-        assert!(scalar_fits_in_u64(&Scalar::from(0)));
-        assert!(scalar_fits_in_u64(&Scalar::from(256)));
-        assert!(scalar_fits_in_u64(&Scalar::from(65535)));
-        assert!(scalar_fits_in_u64(&Scalar::from(u64::MAX)));
-
-        assert!(!scalar_fits_in_u64(
-            &(Scalar::from(u64::MAX) + Scalar::from(1))
-        ));
-        assert!(!scalar_fits_in_u64(
-            &(Scalar::from(u64::MAX) * Scalar::from(2))
-        ));
-    }
-
-    #[test]
-    fn compute_u_ary_decomposition_scalar_to_u64_tests() {
-        let values = [0, 1, 2, 3, 254, 255, 256, 65534, 65535, u64::MAX];
-
-        for v in values {
-            assert_eq!(v as u64, scalar_to_u64(&Scalar::from(v)));
-        }
-    }
-
-    #[test]
-    #[should_panic(expected = "This scalar does not fit in u64")]
-    fn compute_u_ary_decomposition_scalara_to_u64_overflow_panic() {
-        scalar_to_u64(&(Scalar::from(u64::MAX) + Scalar::from(1)));
-    }
-
-    #[test]
-    fn compute_u_ary_decomposition_0() {
-        let decomposition = compute_u_ary_decomposition(&Scalar::from(0), U, L);
-
-        assert_eq!([Scalar::from(0); L].to_vec(), decomposition);
-    }
-
-    #[test]
-    fn compute_u_ary_decomposition_1() {
-        let decomposition_1 = compute_u_ary_decomposition(&Scalar::from(1), U, L);
-        let decomposition_2 = compute_u_ary_decomposition(&Scalar::from(2), U, L);
-        let decomposition_3 = compute_u_ary_decomposition(&Scalar::from(3), U, L);
-
-        let mut decomposition = [Scalar::from(0); L];
-
-        decomposition[0] = Scalar::from(1);
-        assert_eq!(decomposition.to_vec(), decomposition_1);
-
-        decomposition[0] = Scalar::from(2);
-        assert_eq!(decomposition.to_vec(), decomposition_2);
-
-        decomposition[0] = Scalar::from(3);
-        assert_eq!(decomposition.to_vec(), decomposition_3);
-    }
-
-    #[test]
-    fn compute_u_ary_decomposition_2() {
-        let decomposition_4 = compute_u_ary_decomposition(&Scalar::from(4), U, L);
-        let decomposition_9 = compute_u_ary_decomposition(&Scalar::from(9), U, L);
-        let decomposition_14 = compute_u_ary_decomposition(&Scalar::from(14), U, L);
-
-        let mut decomposition = [Scalar::from(0); L];
-
-        decomposition[0] = Scalar::from(0);
-        decomposition[1] = Scalar::from(1);
-        assert_eq!(decomposition.to_vec(), decomposition_4);
-
-        decomposition[0] = Scalar::from(1);
-        decomposition[1] = Scalar::from(2);
-        assert_eq!(decomposition.to_vec(), decomposition_9);
-
-        decomposition[0] = Scalar::from(2);
-        decomposition[1] = Scalar::from(3);
-        assert_eq!(decomposition.to_vec(), decomposition_14);
-    }
-
-    #[test]
-    fn compute_u_ary_decomposition_other() {
-        let decomposition_max = compute_u_ary_decomposition(&Scalar::from(MAX - 1), U, L);
-
-        let random = 23456;
-        let decomposition_random = compute_u_ary_decomposition(&Scalar::from(random), U, L);
-
-        let decomposition = [Scalar::from(3); L];
-        assert_eq!(decomposition.to_vec(), decomposition_max);
-
-        let decomposition = [
-            Scalar::from(0),
-            Scalar::from(0),
-            Scalar::from(2),
-            Scalar::from(2),
-            Scalar::from(3),
-            Scalar::from(2),
-            Scalar::from(1),
-            Scalar::from(1),
-        ];
-        assert_eq!(decomposition.to_vec(), decomposition_random);
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "this number is out of range to compute 4-ary decomposition on 8 base elements ([0, 65536))."
-    )]
-    fn compute_u_ary_decomposition_overflow_panic() {
-        compute_u_ary_decomposition(&Scalar::from(MAX), U, L);
-    }
-
-    #[test]
-    fn issue_range_signatures_len() {
-        let params = setup(1).unwrap();
-        let range_signatures = issue_range_signatures(&params);
-
-        assert_eq!(U, range_signatures.signatures.len());
-    }
 
     #[test]
     fn range_theta_bytes_roundtrip_1() {
         let params = setup(1).unwrap();
+        let sp_h = params.gen1() * params.random_scalar();
+        let sp_key_pair = single_attribute_keygen(&params);
+        let sp_private_key = sp_key_pair.secret_key();
+        let sp_verification_key = sp_key_pair.verification_key();
 
         let verification_key = keygen(&params).verification_key();
         let private_attributes = vec![Scalar::from(10)];
@@ -629,8 +416,7 @@ mod tests {
             params.gen1() * params.random_scalar(),
         );
 
-        let all_range_signatures = issue_range_signatures(&params);
-        let sp_verification_key = &all_range_signatures.sp_verification_key;
+        let range_signatures = issue_range_signatures(&sp_h, &sp_private_key, 0, U);
 
         let a = Scalar::from(0);
         let b = Scalar::from(15);
@@ -644,7 +430,7 @@ mod tests {
             &verification_key,
             &sp_verification_key,
             &signature,
-            &all_range_signatures.signatures,
+            &range_signatures,
             &private_attributes,
         )
         .unwrap();
@@ -658,6 +444,10 @@ mod tests {
     #[test]
     fn range_theta_bytes_roundtrip_10() {
         let params = setup(10).unwrap();
+        let sp_h = params.gen1() * params.random_scalar();
+        let sp_key_pair = single_attribute_keygen(&params);
+        let sp_private_key = sp_key_pair.secret_key();
+        let sp_verification_key = sp_key_pair.verification_key();
 
         let verification_key = keygen(&params).verification_key();
         let private_attributes =
@@ -668,8 +458,7 @@ mod tests {
             params.gen1() * params.random_scalar(),
         );
 
-        let all_range_signatures = issue_range_signatures(&params);
-        let sp_verification_key = &all_range_signatures.sp_verification_key;
+        let range_signatures = issue_range_signatures(&sp_h, &sp_private_key, 0, U);
 
         let a = Scalar::from(0);
         let b = Scalar::from(15);
@@ -683,7 +472,7 @@ mod tests {
             &verification_key,
             &sp_verification_key,
             &signature,
-            &all_range_signatures.signatures,
+            &range_signatures,
             &private_attributes,
         )
         .unwrap();
@@ -697,17 +486,21 @@ mod tests {
     #[test]
     fn range_theta_bytes_roundtrip_5_5() {
         let params = setup(10).unwrap();
+        let sp_h = params.gen1() * params.random_scalar();
+        let sp_key_pair = single_attribute_keygen(&params);
+        let sp_private_key = sp_key_pair.secret_key();
+        let sp_verification_key = sp_key_pair.verification_key();
 
         let verification_key = keygen(&params).verification_key();
-        let private_attributes = [[Scalar::from(10)].to_vec(), params.n_random_scalars(4)].concat();
+        let private_attributes =
+            vec![[Scalar::from(10)].to_vec(), params.n_random_scalars(4)].concat();
 
         let signature = Signature(
             params.gen1() * params.random_scalar(),
             params.gen1() * params.random_scalar(),
         );
 
-        let all_range_signatures = issue_range_signatures(&params);
-        let sp_verification_key = &all_range_signatures.sp_verification_key;
+        let range_signatures = issue_range_signatures(&sp_h, &sp_private_key, 0, U);
 
         let a = Scalar::from(0);
         let b = Scalar::from(15);
@@ -721,7 +514,7 @@ mod tests {
             &verification_key,
             &sp_verification_key,
             &signature,
-            &all_range_signatures.signatures,
+            &range_signatures,
             &private_attributes,
         )
         .unwrap();
