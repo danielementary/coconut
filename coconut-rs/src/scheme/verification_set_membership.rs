@@ -31,11 +31,14 @@ use crate::Attribute;
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct SetMembershipTheta {
-    pub kappa_1: G2Projective,
-    pub a_prime: Signature,
-    pub kappa_2: G2Projective,
-    pub sigma_prime: Signature,
-    pub pi: SetMembershipProof,
+    // "randomized" signatures for picked element and credential
+    // and corresponding material to verify them
+    element_randomized_signature: Signature,
+    element_kappa: G2Projective,
+    credential_randomized_signature: Signature,
+    credential_kappa: G2Projective,
+    // non-interactive zero-knowledge proof for lower and upper bound
+    nizkp: SetMembershipProof,
 }
 
 impl TryFrom<&[u8]> for SetMembershipTheta {

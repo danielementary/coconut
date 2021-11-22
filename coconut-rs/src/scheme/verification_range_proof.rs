@@ -400,6 +400,7 @@ mod tests {
     const U: usize = 4;
     const L: usize = 8;
 
+    // test that we can retrieve the original theta converting to and from bytes
     #[test]
     fn range_theta_bytes_roundtrip_1() {
         let params = setup(1).unwrap();
