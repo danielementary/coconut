@@ -506,6 +506,22 @@ pub fn compute_u_ary_decomposition(
     decomposition
 }
 
+// tests are performed for base u and 8 base elements
+const U: usize = 4;
+const L: usize = 8;
+
+pub const fn default_base_u() -> usize {
+    U
+}
+
+pub const fn default_number_of_base_elements_l() -> usize {
+    L
+}
+
+pub const fn default_max() -> u64 {
+    (U as u64).pow(L as u32)
+}
+
 // use core::fmt;
 // #[cfg(feature = "serde")]
 // use serde::de::Visitor;
@@ -588,11 +604,6 @@ mod tests {
 
     use super::*;
 
-    // tests are performed for base u and 8 base elements
-    const U: usize = 4;
-    const L: usize = 8;
-    const MAX: u64 = (U as u64).pow(L as u32);
-
     #[test]
     fn compute_u_ary_decomposition_scalar_fits_in_u64_tests() {
         assert!(scalar_fits_in_u64(&Scalar::from(0)));
@@ -631,18 +642,37 @@ mod tests {
 
     #[test]
     fn compute_u_ary_decomposition_0() {
-        let decomposition = compute_u_ary_decomposition(&Scalar::from(0), U, L);
+        let decomposition = compute_u_ary_decomposition(
+            &Scalar::from(0),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
 
-        assert_eq!([Scalar::from(0); L].to_vec(), decomposition);
+        assert_eq!(
+            [Scalar::from(0); default_number_of_base_elements_l()].to_vec(),
+            decomposition
+        );
     }
 
     #[test]
     fn compute_u_ary_decomposition_1() {
-        let decomposition_1 = compute_u_ary_decomposition(&Scalar::from(1), U, L);
-        let decomposition_2 = compute_u_ary_decomposition(&Scalar::from(2), U, L);
-        let decomposition_3 = compute_u_ary_decomposition(&Scalar::from(3), U, L);
+        let decomposition_1 = compute_u_ary_decomposition(
+            &Scalar::from(1),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
+        let decomposition_2 = compute_u_ary_decomposition(
+            &Scalar::from(2),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
+        let decomposition_3 = compute_u_ary_decomposition(
+            &Scalar::from(3),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
 
-        let mut decomposition = [Scalar::from(0); L];
+        let mut decomposition = [Scalar::from(0); default_number_of_base_elements_l()];
 
         decomposition[0] = Scalar::from(1);
         assert_eq!(decomposition.to_vec(), decomposition_1);
@@ -656,11 +686,23 @@ mod tests {
 
     #[test]
     fn compute_u_ary_decomposition_2() {
-        let decomposition_4 = compute_u_ary_decomposition(&Scalar::from(4), U, L);
-        let decomposition_9 = compute_u_ary_decomposition(&Scalar::from(9), U, L);
-        let decomposition_14 = compute_u_ary_decomposition(&Scalar::from(14), U, L);
+        let decomposition_4 = compute_u_ary_decomposition(
+            &Scalar::from(4),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
+        let decomposition_9 = compute_u_ary_decomposition(
+            &Scalar::from(9),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
+        let decomposition_14 = compute_u_ary_decomposition(
+            &Scalar::from(14),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
 
-        let mut decomposition = [Scalar::from(0); L];
+        let mut decomposition = [Scalar::from(0); default_number_of_base_elements_l()];
 
         decomposition[0] = Scalar::from(0);
         decomposition[1] = Scalar::from(1);
@@ -677,12 +719,20 @@ mod tests {
 
     #[test]
     fn compute_u_ary_decomposition_other() {
-        let decomposition_max = compute_u_ary_decomposition(&Scalar::from(MAX - 1), U, L);
+        let decomposition_max = compute_u_ary_decomposition(
+            &Scalar::from(default_max() - 1),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
 
         let random = 23456;
-        let decomposition_random = compute_u_ary_decomposition(&Scalar::from(random), U, L);
+        let decomposition_random = compute_u_ary_decomposition(
+            &Scalar::from(random),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
 
-        let decomposition = [Scalar::from(3); L];
+        let decomposition = [Scalar::from(3); default_number_of_base_elements_l()];
         assert_eq!(decomposition.to_vec(), decomposition_max);
 
         let decomposition = [
@@ -703,7 +753,11 @@ mod tests {
         expected = "this number is out of range to compute 4-ary decomposition on 8 base elements ([0, 65536))."
     )]
     fn compute_u_ary_decomposition_overflow_panic() {
-        compute_u_ary_decomposition(&Scalar::from(MAX), U, L);
+        compute_u_ary_decomposition(
+            &Scalar::from(default_max()),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
     }
 
     #[test]
@@ -756,9 +810,9 @@ mod tests {
         let h = params.gen1() * params.random_scalar();
         let private_key = single_attribute_keygen(&params).secret_key();
 
-        let range_signatures = issue_range_signatures(&h, &private_key, 0, U);
+        let range_signatures = issue_range_signatures(&h, &private_key, 0, default_base_u());
 
-        assert_eq!(U, range_signatures.len());
+        assert_eq!(default_base_u(), range_signatures.len());
     }
 
     #[test]
@@ -769,7 +823,7 @@ mod tests {
         let private_key = key_pair.secret_key();
         let verification_key = key_pair.verification_key();
 
-        let range_signatures = issue_range_signatures(&h, &private_key, 0, U);
+        let range_signatures = issue_range_signatures(&h, &private_key, 0, default_base_u());
 
         for (m, Signature(s1, s2)) in range_signatures.iter() {
             let abm =

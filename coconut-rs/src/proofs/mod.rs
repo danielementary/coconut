@@ -634,6 +634,12 @@ impl SetMembershipProof {
         commitment_element_kappa: &G2Projective,
         commitment_credential_kappa: &G2Projective,
     ) -> Scalar {
+        let beta_bytes = verification_key
+            .beta
+            .iter()
+            .map(|b| b.to_bytes())
+            .collect::<Vec<_>>();
+
         compute_challenge::<ChallengeDigest, _, _>(
             std::iter::once(commitment_element_kappa.to_bytes().as_ref())
                 .chain(std::iter::once(
@@ -647,15 +653,7 @@ impl SetMembershipProof {
                     sp_verification_key.beta[0].to_bytes().as_ref(),
                 ))
                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(
-                    verification_key
-                        .beta
-                        .iter()
-                        .map(|b| b.to_bytes())
-                        .collect::<Vec<_>>()
-                        .iter()
-                        .map(|b| b.as_ref()),
-                ),
+                .chain(beta_bytes.iter().map(|b| b.as_ref())),
         )
     }
 
@@ -751,19 +749,19 @@ pub struct RangeProof {
     lower_bound: Scalar,
     upper_bound: Scalar,
     // lower bound
-    commitments_decomposition_lower_bound: Vec<G2Projective>,
-    commitment_credential_blinder_lower_bound: G2Projective,
+    commitments_decomposition_kappas_lower_bound: Vec<G2Projective>,
+    commitment_credential_kappa_lower_bound: G2Projective,
     responses_decomposition_blinders_lower_bound: Vec<Scalar>,
     responses_decomposition_lower_bound: Vec<Scalar>,
+    response_credential_blinder_lower_bound: Scalar,
     responses_private_attributes_lower_bound: Vec<Scalar>,
-    responses_credential_blinder_lower_bound: Scalar,
     // upper bound
-    commitments_decomposition_upper_bound: Vec<G2Projective>,
+    commitments_decomposition_kappas_upper_bound: Vec<G2Projective>,
     commitment_credential_blinder_upper_bound: G2Projective,
     responses_decomposition_blinders_upper_bound: Vec<Scalar>,
     responses_decomposition_upper_bound: Vec<Scalar>,
+    response_credential_blinder_upper_bound: Scalar,
     responses_private_attributes_upper_bound: Vec<Scalar>,
-    responses_credential_blinder_upper_bound: Scalar,
 }
 
 impl RangeProof {
@@ -808,7 +806,7 @@ impl RangeProof {
             params.n_random_scalars(private_attributes.len() - 1);
 
         // compute commitments
-        let commitments_decomposition_lower_bound: Vec<G2Projective> =
+        let commitments_decomposition_kappas_lower_bound: Vec<G2Projective> =
             random_decomposition_blinders_lower_bound
                 .iter()
                 .zip(random_decomposition_lower_bound.iter())
@@ -817,7 +815,7 @@ impl RangeProof {
                 })
                 .collect();
 
-        let commitments_decomposition_upper_bound: Vec<G2Projective> =
+        let commitments_decomposition_kappas_upper_bound: Vec<G2Projective> =
             random_decomposition_blinders_upper_bound
                 .iter()
                 .zip(random_decomposition_upper_bound.iter())
@@ -826,16 +824,16 @@ impl RangeProof {
                 })
                 .collect();
 
-        let beta1 = verification_key.beta[0];
-
-        let commitment_credential_blinder_lower_bound: G2Projective = params.gen2()
+        let commitment_credential_kappa_lower_bound: G2Projective = params.gen2()
             * random_credential_blinder_lower_bound
             + verification_key.alpha
-            + beta1 * lower_bound
+            + verification_key.beta[0] * lower_bound
             + random_decomposition_lower_bound
                 .iter()
                 .enumerate()
-                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((base_u as u64).pow(i as u32))))
+                .map(|(i, r_m)| {
+                    verification_key.beta[0] * r_m * (Scalar::from((base_u as u64).pow(i as u32)))
+                })
                 .sum::<G2Projective>()
             + random_private_attributes_lower_bound
                 .iter()
@@ -846,13 +844,15 @@ impl RangeProof {
         let commitment_credential_blinder_upper_bound: G2Projective = params.gen2()
             * random_credential_blinder_upper_bound
             + verification_key.alpha
-            + beta1
+            + verification_key.beta[0]
                 * (upper_bound
                     - Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32)))
             + random_decomposition_upper_bound
                 .iter()
                 .enumerate()
-                .map(|(i, r_m)| beta1 * r_m * (Scalar::from((base_u as u64).pow(i as u32))))
+                .map(|(i, r_m)| {
+                    verification_key.beta[0] * r_m * (Scalar::from((base_u as u64).pow(i as u32)))
+                })
                 .sum::<G2Projective>()
             + random_private_attributes_upper_bound
                 .iter()
@@ -861,49 +861,14 @@ impl RangeProof {
                 .sum::<G2Projective>();
 
         // compute challenge
-        let commitments_decomposition_lower_bound_bytes = commitments_decomposition_lower_bound
-            .iter()
-            .map(|k| k.to_bytes())
-            .collect::<Vec<_>>();
-
-        let commitments_decomposition_upper_bound_bytes = commitments_decomposition_upper_bound
-            .iter()
-            .map(|k| k.to_bytes())
-            .collect::<Vec<_>>();
-
-        let beta_bytes = verification_key.beta[1..]
-            .iter()
-            .map(|b| b.to_bytes())
-            .collect::<Vec<_>>();
-
-        let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            commitments_decomposition_lower_bound_bytes
-                .iter()
-                .map(|b| b.as_ref())
-                .chain(
-                    commitments_decomposition_upper_bound_bytes
-                        .iter()
-                        .map(|b| b.as_ref()),
-                )
-                .chain(std::iter::once(
-                    commitment_credential_blinder_lower_bound
-                        .to_bytes()
-                        .as_ref(),
-                ))
-                .chain(std::iter::once(
-                    commitment_credential_blinder_upper_bound
-                        .to_bytes()
-                        .as_ref(),
-                ))
-                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
-                .chain(std::iter::once(
-                    sp_verification_key.alpha.to_bytes().as_ref(),
-                ))
-                .chain(std::iter::once(
-                    sp_verification_key.beta[0].to_bytes().as_ref(),
-                ))
-                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(beta_bytes.iter().map(|b| b.as_ref())),
+        let challenge = RangeProof::compute_challenge(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &commitments_decomposition_kappas_lower_bound,
+            &commitment_credential_kappa_lower_bound,
+            &commitments_decomposition_kappas_upper_bound,
+            &commitment_credential_blinder_upper_bound,
         );
 
         // compute responses
@@ -941,12 +906,12 @@ impl RangeProof {
             &challenge,
             &private_attributes[1..],
         );
-        let responses_credential_blinder_lower_bound = produce_response(
+        let response_credential_blinder_lower_bound = produce_response(
             &random_credential_blinder_lower_bound,
             &challenge,
             credential_blinder_lower_bound,
         );
-        let responses_credential_blinder_upper_bound = produce_response(
+        let response_credential_blinder_upper_bound = produce_response(
             &random_credential_blinder_upper_bound,
             &challenge,
             credential_blinder_upper_bound,
@@ -959,24 +924,96 @@ impl RangeProof {
             lower_bound,
             upper_bound,
             // lower bound
-            commitments_decomposition_lower_bound,
-            commitment_credential_blinder_lower_bound,
+            commitments_decomposition_kappas_lower_bound,
+            commitment_credential_kappa_lower_bound,
             responses_decomposition_blinders_lower_bound,
             responses_decomposition_lower_bound,
+            response_credential_blinder_lower_bound,
             responses_private_attributes_lower_bound,
-            responses_credential_blinder_lower_bound,
             // upper bound
-            commitments_decomposition_upper_bound,
+            commitments_decomposition_kappas_upper_bound,
             commitment_credential_blinder_upper_bound,
             responses_decomposition_blinders_upper_bound,
             responses_decomposition_upper_bound,
+            response_credential_blinder_upper_bound,
             responses_private_attributes_upper_bound,
-            responses_credential_blinder_upper_bound,
         }
     }
 
     pub(crate) fn private_attributes(&self) -> usize {
         self.responses_private_attributes_lower_bound.len()
+    }
+
+    fn compute_challenge(
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+        commitments_decomposition_kappas_lower_bound: &Vec<G2Projective>,
+        commitment_credential_kappa_lower_bound: &G2Projective,
+        commitments_decomposition_kappas_upper_bound: &Vec<G2Projective>,
+        commitment_credential_blinder_upper_bound: &G2Projective,
+    ) -> Scalar {
+        let commitments_decomposition_kappas_lower_bound_bytes =
+            commitments_decomposition_kappas_lower_bound
+                .iter()
+                .map(|k| k.to_bytes())
+                .collect::<Vec<_>>();
+
+        let commitments_decomposition_kappas_upper_bound_bytes =
+            commitments_decomposition_kappas_upper_bound
+                .iter()
+                .map(|k| k.to_bytes())
+                .collect::<Vec<_>>();
+
+        let beta_bytes = verification_key.beta[1..]
+            .iter()
+            .map(|b| b.to_bytes())
+            .collect::<Vec<_>>();
+
+        compute_challenge::<ChallengeDigest, _, _>(
+            commitments_decomposition_kappas_lower_bound_bytes
+                .iter()
+                .map(|b| b.as_ref())
+                .chain(
+                    commitments_decomposition_kappas_upper_bound_bytes
+                        .iter()
+                        .map(|b| b.as_ref()),
+                )
+                .chain(std::iter::once(
+                    commitment_credential_kappa_lower_bound.to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(
+                    commitment_credential_blinder_upper_bound
+                        .to_bytes()
+                        .as_ref(),
+                ))
+                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
+                .chain(std::iter::once(
+                    sp_verification_key.alpha.to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(
+                    sp_verification_key.beta[0].to_bytes().as_ref(),
+                ))
+                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
+                .chain(beta_bytes.iter().map(|b| b.as_ref())),
+        )
+    }
+
+    fn recompute_challenge(
+        &self,
+        params: &Parameters,
+        verification_key: &VerificationKey,
+        sp_verification_key: &VerificationKey,
+    ) -> Scalar {
+        RangeProof::compute_challenge(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &self.commitments_decomposition_kappas_lower_bound,
+            &self.commitment_credential_kappa_lower_bound,
+            &self.commitments_decomposition_kappas_upper_bound,
+            &self.commitment_credential_blinder_upper_bound,
+        )
     }
 
     pub(crate) fn verify(
@@ -992,67 +1029,18 @@ impl RangeProof {
         decomposition_kappas_upper_bound: &Vec<G2Projective>,
         credential_kappa_upper_bound: &G2Projective,
     ) -> bool {
-        let commitments_decomposition_lower_bound_bytes = self
-            .commitments_decomposition_lower_bound
-            .iter()
-            .map(|k| k.to_bytes())
-            .collect::<Vec<_>>();
-
-        let commitments_decomposition_upper_bound_bytes = self
-            .commitments_decomposition_upper_bound
-            .iter()
-            .map(|k| k.to_bytes())
-            .collect::<Vec<_>>();
-
-        let beta_bytes = verification_key.beta[1..]
-            .iter()
-            .map(|b| b.to_bytes())
-            .collect::<Vec<_>>();
-
         // recompute challenge
-        let challenge = compute_challenge::<ChallengeDigest, _, _>(
-            commitments_decomposition_lower_bound_bytes
-                .iter()
-                .map(|b| b.as_ref())
-                .chain(
-                    commitments_decomposition_upper_bound_bytes
-                        .iter()
-                        .map(|b| b.as_ref()),
-                )
-                .chain(std::iter::once(
-                    self.commitment_credential_blinder_lower_bound
-                        .to_bytes()
-                        .as_ref(),
-                ))
-                .chain(std::iter::once(
-                    self.commitment_credential_blinder_upper_bound
-                        .to_bytes()
-                        .as_ref(),
-                ))
-                .chain(std::iter::once(params.gen2().to_bytes().as_ref()))
-                .chain(std::iter::once(
-                    sp_verification_key.alpha.to_bytes().as_ref(),
-                ))
-                .chain(std::iter::once(
-                    sp_verification_key.beta[0].to_bytes().as_ref(),
-                ))
-                .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(beta_bytes.iter().map(|b| b.as_ref())),
-        );
+        let challenge = self.recompute_challenge(&params, &verification_key, &sp_verification_key);
 
-        let kappas_a_lhs = self
-            .commitments_decomposition_lower_bound
+        // check decomposition kappas
+        // lower bound
+        let decomposition_kappas_lower_bound_lhs = self
+            .commitments_decomposition_kappas_lower_bound
             .iter()
             .map(|k| sp_verification_key.alpha * (-Scalar::one()) + k)
             .collect::<Vec<_>>();
 
-        let kappas_b_lhs = self
-            .commitments_decomposition_upper_bound
-            .iter()
-            .map(|k| sp_verification_key.alpha * (-Scalar::one()) + k)
-            .collect::<Vec<_>>();
-
-        let kappas_a_rhs = izip!(
+        let decomposition_kappas_upper_bound_rhs = izip!(
             decomposition_kappas_lower_bound,
             &self.responses_decomposition_blinders_lower_bound,
             &self.responses_decomposition_lower_bound
@@ -1064,7 +1052,14 @@ impl RangeProof {
         })
         .collect::<Vec<_>>();
 
-        let kappas_b_rhs = izip!(
+        // upper bound
+        let decomposition_kappas_upper_bound_lhs = self
+            .commitments_decomposition_kappas_upper_bound
+            .iter()
+            .map(|k| sp_verification_key.alpha * (-Scalar::one()) + k)
+            .collect::<Vec<_>>();
+
+        let decomposition_kappas_lower_bound_rhs = izip!(
             decomposition_kappas_upper_bound,
             &self.responses_decomposition_blinders_upper_bound,
             &self.responses_decomposition_upper_bound
@@ -1076,21 +1071,25 @@ impl RangeProof {
         })
         .collect::<Vec<_>>();
 
-        let beta1 = verification_key.beta[0];
-
-        let kappa_a_lhs = verification_key.alpha * (-Scalar::one())
-            + self.commitment_credential_blinder_lower_bound;
-        let kappa_a_rhs = (verification_key.alpha * (-Scalar::one())
+        // check credential kappas
+        // lower bound
+        let credential_kappa_lower_bound_lhs = verification_key.alpha * (-Scalar::one())
+            + self.commitment_credential_kappa_lower_bound;
+        let credential_kappa_lower_bound_rhs = (verification_key.alpha * (-Scalar::one())
             + credential_kappa_lower_bound
-            + beta1 * -self.lower_bound)
+            + verification_key.beta[0] * -self.lower_bound)
             * challenge
-            + params.gen2() * self.responses_credential_blinder_lower_bound
-            + beta1 * self.lower_bound
+            + params.gen2() * self.response_credential_blinder_lower_bound
+            + verification_key.beta[0] * self.lower_bound
             + self
                 .responses_decomposition_lower_bound
                 .iter()
                 .enumerate()
-                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
+                .map(|(i, s_m)| {
+                    verification_key.beta[0]
+                        * s_m
+                        * (Scalar::from((self.base_u as u64).pow(i as u32)))
+                })
                 .sum::<G2Projective>()
             + self
                 .responses_private_attributes_lower_bound
@@ -1099,18 +1098,19 @@ impl RangeProof {
                 .map(|(s_mi, beta_i)| beta_i * s_mi)
                 .sum::<G2Projective>();
 
-        let kappa_b_lhs = verification_key.alpha * (-Scalar::one())
+        // upper bound
+        let credential_kappa_upper_bound_lhs = verification_key.alpha * (-Scalar::one())
             + self.commitment_credential_blinder_upper_bound;
-        let kappa_b_rhs = (verification_key.alpha * (-Scalar::one())
+        let credential_kappa_upper_bound_rhs = (verification_key.alpha * (-Scalar::one())
             + credential_kappa_upper_bound
-            + beta1
+            + verification_key.beta[0]
                 * -(self.upper_bound
                     - Scalar::from(
                         (self.base_u as u64).pow(self.number_of_base_elements_l as u32),
                     )))
             * challenge
-            + params.gen2() * self.responses_credential_blinder_upper_bound
-            + beta1
+            + params.gen2() * self.response_credential_blinder_upper_bound
+            + verification_key.beta[0]
                 * (self.upper_bound
                     - Scalar::from(
                         (self.base_u as u64).pow(self.number_of_base_elements_l as u32),
@@ -1119,7 +1119,11 @@ impl RangeProof {
                 .responses_decomposition_upper_bound
                 .iter()
                 .enumerate()
-                .map(|(i, s_m)| beta1 * s_m * (Scalar::from((self.base_u as u64).pow(i as u32))))
+                .map(|(i, s_m)| {
+                    verification_key.beta[0]
+                        * s_m
+                        * (Scalar::from((self.base_u as u64).pow(i as u32)))
+                })
                 .sum::<G2Projective>()
             + self
                 .responses_private_attributes_upper_bound
@@ -1128,10 +1132,10 @@ impl RangeProof {
                 .map(|(s_mi, beta_i)| beta_i * s_mi)
                 .sum::<G2Projective>();
 
-        kappas_a_lhs == kappas_a_rhs
-            && kappas_b_lhs == kappas_b_rhs
-            && kappa_a_lhs == kappa_a_rhs
-            && kappa_b_lhs == kappa_b_rhs
+        decomposition_kappas_lower_bound_lhs == decomposition_kappas_upper_bound_rhs
+            && decomposition_kappas_upper_bound_lhs == decomposition_kappas_lower_bound_rhs
+            && credential_kappa_lower_bound_lhs == credential_kappa_lower_bound_rhs
+            && credential_kappa_upper_bound_lhs == credential_kappa_upper_bound_rhs
     }
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
@@ -1146,17 +1150,23 @@ impl RangeProof {
         serialize_scalar(&self.lower_bound, &mut bytes);
         serialize_scalar(&self.upper_bound, &mut bytes);
 
-        serialize_g2_projectives(&self.commitments_decomposition_lower_bound, &mut bytes);
-        serialize_g2_projective(&self.commitment_credential_blinder_lower_bound, &mut bytes);
+        serialize_g2_projectives(
+            &self.commitments_decomposition_kappas_lower_bound,
+            &mut bytes,
+        );
+        serialize_g2_projective(&self.commitment_credential_kappa_lower_bound, &mut bytes);
         serialize_scalars(
             &self.responses_decomposition_blinders_lower_bound,
             &mut bytes,
         );
         serialize_scalars(&self.responses_decomposition_lower_bound, &mut bytes);
         serialize_scalars(&self.responses_private_attributes_lower_bound, &mut bytes);
-        serialize_scalar(&self.responses_credential_blinder_lower_bound, &mut bytes);
+        serialize_scalar(&self.response_credential_blinder_lower_bound, &mut bytes);
 
-        serialize_g2_projectives(&self.commitments_decomposition_upper_bound, &mut bytes);
+        serialize_g2_projectives(
+            &self.commitments_decomposition_kappas_upper_bound,
+            &mut bytes,
+        );
         serialize_g2_projective(&self.commitment_credential_blinder_upper_bound, &mut bytes);
         serialize_scalars(
             &self.responses_decomposition_blinders_upper_bound,
@@ -1164,7 +1174,7 @@ impl RangeProof {
         );
         serialize_scalars(&self.responses_decomposition_upper_bound, &mut bytes);
         serialize_scalars(&self.responses_private_attributes_upper_bound, &mut bytes);
-        serialize_scalar(&self.responses_credential_blinder_upper_bound, &mut bytes);
+        serialize_scalar(&self.response_credential_blinder_upper_bound, &mut bytes);
 
         bytes
     }
@@ -1181,9 +1191,9 @@ impl RangeProof {
         let lower_bound = deserialize_scalar(&bytes, &mut pointer);
         let upper_bound = deserialize_scalar(&bytes, &mut pointer);
 
-        let commitments_decomposition_lower_bound =
+        let commitments_decomposition_kappas_lower_bound =
             deserialize_g2_projectives(&bytes, &mut pointer, number_of_base_elements_l);
-        let commitment_credential_blinder_lower_bound =
+        let commitment_credential_kappa_lower_bound =
             deserialize_g2_projective(&bytes, &mut pointer);
         let responses_decomposition_blinders_lower_bound =
             deserialize_scalars(&bytes, &mut pointer, number_of_base_elements_l);
@@ -1194,9 +1204,9 @@ impl RangeProof {
             &mut pointer,
             number_of_serialized_private_attributes,
         );
-        let responses_credential_blinder_lower_bound = deserialize_scalar(&bytes, &mut pointer);
+        let response_credential_blinder_lower_bound = deserialize_scalar(&bytes, &mut pointer);
 
-        let commitments_decomposition_upper_bound =
+        let commitments_decomposition_kappas_upper_bound =
             deserialize_g2_projectives(&bytes, &mut pointer, number_of_base_elements_l);
         let commitment_credential_blinder_upper_bound =
             deserialize_g2_projective(&bytes, &mut pointer);
@@ -1209,7 +1219,7 @@ impl RangeProof {
             &mut pointer,
             number_of_serialized_private_attributes,
         );
-        let responses_credential_blinder_upper_bound = deserialize_scalar(&bytes, &mut pointer);
+        let response_credential_blinder_upper_bound = deserialize_scalar(&bytes, &mut pointer);
 
         Ok(RangeProof {
             // parameters
@@ -1218,19 +1228,19 @@ impl RangeProof {
             lower_bound,
             upper_bound,
             // lower bound
-            commitments_decomposition_lower_bound,
-            commitment_credential_blinder_lower_bound,
+            commitments_decomposition_kappas_lower_bound,
+            commitment_credential_kappa_lower_bound,
             responses_decomposition_blinders_lower_bound,
             responses_decomposition_lower_bound,
+            response_credential_blinder_lower_bound,
             responses_private_attributes_lower_bound,
-            responses_credential_blinder_lower_bound,
             // upper bound
-            commitments_decomposition_upper_bound,
+            commitments_decomposition_kappas_upper_bound,
             commitment_credential_blinder_upper_bound,
             responses_decomposition_blinders_upper_bound,
             responses_decomposition_upper_bound,
+            response_credential_blinder_upper_bound,
             responses_private_attributes_upper_bound,
-            responses_credential_blinder_upper_bound,
         })
     }
 }
@@ -1246,17 +1256,14 @@ mod tests {
     use crate::scheme::setup::setup;
     use crate::scheme::verification::compute_kappa;
     use crate::utils::{
-        compute_u_ary_decomposition, issue_range_signatures, issue_set_signatures, pick_signature,
-        pick_signatures_for_decomposition,
+        compute_u_ary_decomposition, default_base_u, default_max,
+        default_number_of_base_elements_l, issue_range_signatures, issue_set_signatures,
+        pick_signature, pick_signatures_for_decomposition,
     };
 
     use crate::utils::RawAttribute;
 
     use super::*;
-
-    // tests are performed for base u and 8 base elements
-    const U: usize = 4;
-    const L: usize = 8;
 
     #[test]
     fn proof_cm_cs_bytes_roundtrip() {
@@ -1662,6 +1669,7 @@ mod tests {
         assert_eq!(SetMembershipProof::from_bytes(&pi.to_bytes()).unwrap(), pi);
     }
 
+    // test that RangeProof is verified with on single private attribute
     #[test]
     fn range_proof_correctness_1() {
         // init parameters for 1 message credential
@@ -1671,8 +1679,8 @@ mod tests {
         let sp_private_key = sp_key_pair.secret_key();
         let sp_verification_key = sp_key_pair.verification_key();
 
-        let base_u = U;
-        let number_of_base_elements_l = L;
+        let base_u = default_base_u();
+        let number_of_base_elements_l = default_number_of_base_elements_l();
         let lower_bound = Scalar::from(5);
         let upper_bound = Scalar::from(15);
 
@@ -1696,22 +1704,25 @@ mod tests {
                 + h * (private_key.ys[0] * (Attribute::from(private_attribute))),
         );
 
+        // lower bound
         let decomposition_lower_bound = compute_u_ary_decomposition(
             &(private_attribute_for_proof - lower_bound),
             base_u,
             number_of_base_elements_l,
         );
+
         let decomposition_signatures_lower_bound =
             pick_signatures_for_decomposition(&decomposition_lower_bound, &range_signatures);
-        let (_decomposition_randomized_signatures_lower_bound, decomposition_blinders_lower_bound): (
-        Vec<_>,
-        Vec<_>,
-    ) = decomposition_signatures_lower_bound
-        .iter()
-        .map(|s| s.randomise(&params))
-        .unzip();
+
+        let (_, decomposition_blinders_lower_bound): (Vec<_>, Vec<_>) =
+            decomposition_signatures_lower_bound
+                .iter()
+                .map(|s| s.randomise(&params))
+                .unzip();
+
         let (_randomized_credential_lower_bound, credential_blinder_lower_bound) =
             credential.randomise(&params);
+
         let decomposition_kappas_lower_bound = decomposition_blinders_lower_bound
             .iter()
             .enumerate()
@@ -1724,6 +1735,7 @@ mod tests {
                 )
             })
             .collect();
+
         let credential_kappa_lower_bound = compute_kappa(
             &params,
             &verification_key,
@@ -1738,17 +1750,18 @@ mod tests {
             base_u,
             number_of_base_elements_l,
         );
+
         let decomposition_signatures_upper_bound =
             pick_signatures_for_decomposition(&decomposition_upper_bound, &range_signatures);
-        let (_decomposition_randomized_signatures_upper_bound, decomposition_blinders_upper_bound): (
-        Vec<_>,
-        Vec<_>,
-    ) = decomposition_signatures_upper_bound
-        .iter()
-        .map(|s| s.randomise(&params))
-        .unzip();
-        let (_randomized_credential_upper_bound, credential_blinder_upper_bound) =
-            credential.randomise(&params);
+
+        let (_, decomposition_blinders_upper_bound): (Vec<_>, Vec<_>) =
+            decomposition_signatures_upper_bound
+                .iter()
+                .map(|s| s.randomise(&params))
+                .unzip();
+
+        let (_, credential_blinder_upper_bound) = credential.randomise(&params);
+
         let decomposition_kappas_upper_bound = decomposition_blinders_upper_bound
             .iter()
             .enumerate()
@@ -1761,6 +1774,7 @@ mod tests {
                 )
             })
             .collect();
+
         let credential_kappa_upper_bound = compute_kappa(
             &params,
             &verification_key,
@@ -1788,7 +1802,291 @@ mod tests {
         // verify that constructed proof is a valid one
         assert!(nizkp.verify(
             &params,
-            &key_pair.verification_key(),
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_kappas_lower_bound,
+            &credential_kappa_lower_bound,
+            &decomposition_kappas_upper_bound,
+            &credential_kappa_upper_bound,
+        ));
+    }
+
+    // test that RangeProof is verified with on two private attributes
+    #[test]
+    fn range_proof_correctness_2() {
+        // init parameters for 2 message credential
+        let params = setup(2).unwrap();
+        let sp_h = params.gen1() * params.random_scalar();
+        let sp_key_pair = single_attribute_keygen(&params);
+        let sp_private_key = sp_key_pair.secret_key();
+        let sp_verification_key = sp_key_pair.verification_key();
+
+        let base_u = default_base_u();
+        let number_of_base_elements_l = default_number_of_base_elements_l();
+        let lower_bound = Scalar::from(5);
+        let upper_bound = Scalar::from(15);
+
+        // define two private attributes
+        let private_attribute = 10;
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+        let private_attributes = vec![private_attribute_for_proof, params.random_scalar()];
+
+        // issue signatures for all base u elements
+        let range_signatures = issue_range_signatures(&sp_h, &sp_private_key, 0, base_u);
+
+        // simulate a valid signature on attribute
+        let h = params.gen1() * params.random_scalar();
+        let key_pair = keygen(&params);
+        let private_key = key_pair.secret_key();
+        let verification_key = key_pair.verification_key();
+
+        let credential = Signature(
+            h,
+            h * key_pair.secret_key().x
+                + h * (private_key.ys[0] * (Attribute::from(private_attributes[0]))
+                    + private_key.ys[1] * (Attribute::from(private_attributes[1]))),
+        );
+
+        // lower bound
+        let decomposition_lower_bound = compute_u_ary_decomposition(
+            &(private_attribute_for_proof - lower_bound),
+            base_u,
+            number_of_base_elements_l,
+        );
+
+        let decomposition_signatures_lower_bound =
+            pick_signatures_for_decomposition(&decomposition_lower_bound, &range_signatures);
+
+        let (_, decomposition_blinders_lower_bound): (Vec<_>, Vec<_>) =
+            decomposition_signatures_lower_bound
+                .iter()
+                .map(|s| s.randomise(&params))
+                .unzip();
+
+        let (_, credential_blinder_lower_bound) = credential.randomise(&params);
+
+        let decomposition_kappas_lower_bound = decomposition_blinders_lower_bound
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                compute_kappa(
+                    &params,
+                    &sp_verification_key,
+                    &decomposition_lower_bound[i..],
+                    *b,
+                )
+            })
+            .collect();
+
+        let credential_kappa_lower_bound = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder_lower_bound,
+        );
+
+        // upper bound run
+        let decomposition_upper_bound = compute_u_ary_decomposition(
+            &(private_attribute_for_proof - upper_bound
+                + Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32))),
+            base_u,
+            number_of_base_elements_l,
+        );
+
+        let decomposition_signatures_upper_bound =
+            pick_signatures_for_decomposition(&decomposition_upper_bound, &range_signatures);
+
+        let (_, decomposition_blinders_upper_bound): (Vec<_>, Vec<_>) =
+            decomposition_signatures_upper_bound
+                .iter()
+                .map(|s| s.randomise(&params))
+                .unzip();
+
+        let (_, credential_blinder_upper_bound) = credential.randomise(&params);
+
+        let decomposition_kappas_upper_bound = decomposition_blinders_upper_bound
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                compute_kappa(
+                    &params,
+                    &sp_verification_key,
+                    &decomposition_upper_bound[i..],
+                    *b,
+                )
+            })
+            .collect();
+
+        let credential_kappa_upper_bound = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder_upper_bound,
+        );
+
+        let nizkp = RangeProof::construct(
+            &params,
+            base_u,
+            number_of_base_elements_l,
+            lower_bound,
+            upper_bound,
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_lower_bound,
+            &decomposition_blinders_lower_bound,
+            &credential_blinder_lower_bound,
+            &decomposition_upper_bound,
+            &decomposition_blinders_upper_bound,
+            &credential_blinder_upper_bound,
+            &private_attributes,
+        );
+
+        // verify that constructed proof is a valid one
+        assert!(nizkp.verify(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_kappas_lower_bound,
+            &credential_kappa_lower_bound,
+            &decomposition_kappas_upper_bound,
+            &credential_kappa_upper_bound,
+        ));
+    }
+
+    // test that RangeProof is verified with on single private attribute and one public one
+    #[test]
+    fn range_proof_correctness_1_1() {
+        // init parameters for 1 message credential
+        let params = setup(2).unwrap();
+        let sp_h = params.gen1() * params.random_scalar();
+        let sp_key_pair = single_attribute_keygen(&params);
+        let sp_private_key = sp_key_pair.secret_key();
+        let sp_verification_key = sp_key_pair.verification_key();
+
+        let base_u = default_base_u();
+        let number_of_base_elements_l = default_number_of_base_elements_l();
+        let lower_bound = Scalar::from(5);
+        let upper_bound = Scalar::from(15);
+
+        // define one single private attribute
+        let private_attribute = 10;
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+        let private_attributes = vec![private_attribute_for_proof];
+
+        // issue signatures for all base u elements
+        let range_signatures = issue_range_signatures(&sp_h, &sp_private_key, 0, base_u);
+
+        // simulate a valid signature on attribute
+        let h = params.gen1() * params.random_scalar();
+        let key_pair = keygen(&params);
+        let private_key = key_pair.secret_key();
+        let verification_key = key_pair.verification_key();
+
+        let credential = Signature(
+            h,
+            h * key_pair.secret_key().x
+                + h * (private_key.ys[0] * (Attribute::from(private_attribute))),
+        );
+
+        // lower bound
+        let decomposition_lower_bound = compute_u_ary_decomposition(
+            &(private_attribute_for_proof - lower_bound),
+            base_u,
+            number_of_base_elements_l,
+        );
+
+        let decomposition_signatures_lower_bound =
+            pick_signatures_for_decomposition(&decomposition_lower_bound, &range_signatures);
+
+        let (_, decomposition_blinders_lower_bound): (Vec<_>, Vec<_>) =
+            decomposition_signatures_lower_bound
+                .iter()
+                .map(|s| s.randomise(&params))
+                .unzip();
+
+        let (_randomized_credential_lower_bound, credential_blinder_lower_bound) =
+            credential.randomise(&params);
+
+        let decomposition_kappas_lower_bound = decomposition_blinders_lower_bound
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                compute_kappa(
+                    &params,
+                    &sp_verification_key,
+                    &decomposition_lower_bound[i..],
+                    *b,
+                )
+            })
+            .collect();
+
+        let credential_kappa_lower_bound = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder_lower_bound,
+        );
+
+        // upper bound run
+        let decomposition_upper_bound = compute_u_ary_decomposition(
+            &(private_attribute_for_proof - upper_bound
+                + Scalar::from((base_u as u64).pow(number_of_base_elements_l as u32))),
+            base_u,
+            number_of_base_elements_l,
+        );
+
+        let decomposition_signatures_upper_bound =
+            pick_signatures_for_decomposition(&decomposition_upper_bound, &range_signatures);
+
+        let (_, decomposition_blinders_upper_bound): (Vec<_>, Vec<_>) =
+            decomposition_signatures_upper_bound
+                .iter()
+                .map(|s| s.randomise(&params))
+                .unzip();
+
+        let (_, credential_blinder_upper_bound) = credential.randomise(&params);
+
+        let decomposition_kappas_upper_bound = decomposition_blinders_upper_bound
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                compute_kappa(
+                    &params,
+                    &sp_verification_key,
+                    &decomposition_upper_bound[i..],
+                    *b,
+                )
+            })
+            .collect();
+
+        let credential_kappa_upper_bound = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder_upper_bound,
+        );
+
+        let nizkp = RangeProof::construct(
+            &params,
+            base_u,
+            number_of_base_elements_l,
+            lower_bound,
+            upper_bound,
+            &verification_key,
+            &sp_verification_key,
+            &decomposition_lower_bound,
+            &decomposition_blinders_lower_bound,
+            &credential_blinder_lower_bound,
+            &decomposition_upper_bound,
+            &decomposition_blinders_upper_bound,
+            &credential_blinder_upper_bound,
+            &private_attributes,
+        );
+
+        // verify that constructed proof is a valid one
+        assert!(nizkp.verify(
+            &params,
+            &verification_key,
             &sp_verification_key,
             &decomposition_kappas_lower_bound,
             &credential_kappa_lower_bound,
@@ -1800,74 +2098,83 @@ mod tests {
     #[test]
     #[should_panic]
     fn range_proof_correctness_out_of_bound_panic_1() {
-        // define two private attributes but only the first one is used for range proof
         let private_attribute = 10;
         let private_attribute_for_proof = Scalar::from(private_attribute);
 
-        // define lower and upper bound for range proof
-        let a = Scalar::from(11);
-        let b = Scalar::from(15);
+        // define lower and upper bound for range proof where lower bound > private_attribute
+        let lower_bound = Scalar::from(11);
+        let upper_bound = Scalar::from(15);
 
-        // compute u-ary decomposition for private_attribute_for_proof-a and
-        // private_attribute_for_proof-b+u^l
+        // compute u-ary decomposition for private_attribute_for_proof-lower_bound and
+        // private_attribute_for_proof-upper_bound+u^l
         // should panic because the private attribute is not in the given range
-        compute_u_ary_decomposition(&(private_attribute_for_proof - a), U, L);
         compute_u_ary_decomposition(
-            &(private_attribute_for_proof - b + Scalar::from((U as u64).pow(L as u32))),
-            U,
-            L,
+            &(private_attribute_for_proof - lower_bound),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
+        compute_u_ary_decomposition(
+            &(private_attribute_for_proof - upper_bound + Scalar::from(default_max())),
+            default_base_u(),
+            default_number_of_base_elements_l(),
         );
     }
 
     #[test]
     #[should_panic]
     fn range_proof_correctness_out_of_bound_panic_2() {
-        // define two private attributes but only the first one is used for range proof
         let private_attribute = 15;
         let private_attribute_for_proof = Scalar::from(private_attribute);
 
-        // define lower and upper bound for range proof
-        let a = Scalar::from(11);
-        let b = Scalar::from(15);
+        // define lower and upper bound for range proof where upper bound = private attribute
+        let lower_bound = Scalar::from(11);
+        let upper_bound = Scalar::from(15);
 
-        // compute u-ary decomposition for private_attribute_for_proof-a and
-        // private_attribute_for_proof-b+u^l
+        // compute u-ary decomposition for private_attribute_for_proof-lower_bound and
+        // private_attribute_for_proof-upper_bound+u^l
         // should panic because the private attribute is not in the given range
-        compute_u_ary_decomposition(&(private_attribute_for_proof - a), U, L);
         compute_u_ary_decomposition(
-            &(private_attribute_for_proof - b + Scalar::from((U as u64).pow(L as u32))),
-            U,
-            L,
+            &(private_attribute_for_proof - lower_bound),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
+        compute_u_ary_decomposition(
+            &(private_attribute_for_proof - upper_bound + Scalar::from(default_max())),
+            default_base_u(),
+            default_number_of_base_elements_l(),
         );
     }
 
     #[test]
     #[should_panic]
     fn range_proof_correctness_out_of_bound_panic_3() {
-        // define two private attributes but only the first one is used for range proof
         let private_attribute = 16;
         let private_attribute_for_proof = Scalar::from(private_attribute);
 
-        // define lower and upper bound for range proof
-        let a = Scalar::from(11);
-        let b = Scalar::from(15);
+        // define lower and upper bound for range proof where upper bound > private attribute
+        let lower_bound = Scalar::from(11);
+        let upper_bound = Scalar::from(15);
 
-        // compute u-ary decomposition for private_attribute_for_proof-a and
-        // private_attribute_for_proof-b+u^l
+        // compute u-ary decomposition for private_attribute_for_proof-lower_bound and
+        // private_attribute_for_proof-upper_bound+u^l
         // should panic because the private attribute is not in the given range
-        compute_u_ary_decomposition(&(private_attribute_for_proof - a), U, L);
         compute_u_ary_decomposition(
-            &(private_attribute_for_proof - b + Scalar::from((U as u64).pow(L as u32))),
-            U,
-            L,
+            &(private_attribute_for_proof - lower_bound),
+            default_base_u(),
+            default_number_of_base_elements_l(),
+        );
+        compute_u_ary_decomposition(
+            &(private_attribute_for_proof - upper_bound + Scalar::from(default_max())),
+            default_base_u(),
+            default_number_of_base_elements_l(),
         );
     }
 
     #[test]
     fn range_proof_bytes_roundtrip_1() {
         let params = setup(1).unwrap();
-        let base_u = 4;
-        let number_of_base_elements_l = 8;
+        let base_u = default_base_u();
+        let number_of_base_elements_l = default_number_of_base_elements_l();
         let lower_bound = params.random_scalar();
         let upper_bound = params.random_scalar();
 
