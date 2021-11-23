@@ -18,7 +18,7 @@ use std::borrow::Borrow;
 use std::convert::TryInto;
 
 use bls12_381::{G1Projective, G2Projective, Scalar};
-use group::{Curve, GroupEncoding};
+use group::GroupEncoding;
 
 use digest::generic_array::typenum::Unsigned;
 use digest::Digest;
@@ -33,14 +33,11 @@ use crate::utils::{
     deserialize_g2_projective, deserialize_g2_projectives, deserialize_scalar, deserialize_scalars,
     deserialize_usize,
 };
-use crate::utils::{
-    hash_g1, try_deserialize_g2_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
-};
+use crate::utils::{hash_g1, try_deserialize_scalar, try_deserialize_scalar_vec};
 use crate::utils::{
     serialize_g2_projective, serialize_g2_projectives, serialize_scalar, serialize_scalars,
     serialize_usize,
 };
-use crate::utils::{G2PCOMPRESSED_SIZE, SCALAR_SIZE, USIZE_SIZE};
 use crate::{elgamal, Attribute, ElGamalKeyPair};
 
 // as per the reference python implementation
@@ -560,8 +557,10 @@ impl ProofKappaNu {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct SetMembershipProof {
+    // commitments
     commitment_element_kappa: G2Projective,
     commitment_credential_kappa: G2Projective,
+    // responses
     response_element_blinder: Scalar,
     response_credential_blinder: Scalar,
     responses_private_attributes: Vec<Scalar>,
@@ -609,12 +608,9 @@ impl SetMembershipProof {
 
         // responses
         let response_element_blinder =
-            produce_response(&random_element_blinder, &challenge, &random_element_blinder);
-        let response_credential_blinder = produce_response(
-            &random_credential_blinder,
-            &challenge,
-            &random_credential_blinder,
-        );
+            produce_response(&random_element_blinder, &challenge, &element_blinder);
+        let response_credential_blinder =
+            produce_response(&random_credential_blinder, &challenge, &credential_blinder);
         let responses_private_attributes =
             produce_responses(&random_private_attributes, &challenge, private_attributes);
 
@@ -651,7 +647,15 @@ impl SetMembershipProof {
                     sp_verification_key.beta[0].to_bytes().as_ref(),
                 ))
                 .chain(std::iter::once(verification_key.alpha.to_bytes().as_ref()))
-                .chain(verification_key.beta.iter().map(|b| b.to_bytes().as_ref())),
+                .chain(
+                    verification_key
+                        .beta
+                        .iter()
+                        .map(|b| b.to_bytes())
+                        .collect::<Vec<_>>()
+                        .iter()
+                        .map(|b| b.as_ref()),
+                ),
         )
     }
 
@@ -675,20 +679,22 @@ impl SetMembershipProof {
         params: &Parameters,
         verification_key: &VerificationKey,
         sp_verification_key: &VerificationKey,
-        kappa_1: &G2Projective,
-        kappa_2: &G2Projective,
+        element_kappa: &G2Projective,
+        credential_kappa: &G2Projective,
     ) -> bool {
         let challenge = self.recompute_challenge(&params, &verification_key, &sp_verification_key);
 
-        let kappa_1_lhs =
+        let element_lhs =
             sp_verification_key.alpha * (-Scalar::one()) + self.commitment_element_kappa;
-        let kappa_1_rhs = (sp_verification_key.alpha * (-Scalar::one()) + kappa_1) * challenge
+        let element_rhs = (sp_verification_key.alpha * (-Scalar::one()) + element_kappa)
+            * challenge
             + params.gen2() * self.response_element_blinder
             + sp_verification_key.beta[0] * self.responses_private_attributes[0];
 
-        let kappa_2_lhs =
+        let credential_lhs =
             verification_key.alpha * (-Scalar::one()) + self.commitment_credential_kappa;
-        let kappa_2_rhs = (verification_key.alpha * (-Scalar::one()) + kappa_2) * challenge
+        let credential_rhs = (verification_key.alpha * (-Scalar::one()) + credential_kappa)
+            * challenge
             + params.gen2() * self.response_credential_blinder
             + verification_key
                 .beta
@@ -697,11 +703,11 @@ impl SetMembershipProof {
                 .map(|(beta, s_m)| beta * s_m)
                 .sum::<G2Projective>();
 
-        kappa_1_lhs == kappa_1_rhs && kappa_2_lhs == kappa_2_rhs
+        element_lhs == element_rhs && credential_lhs == credential_rhs
     }
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        let bytes = Vec::new();
+        let mut bytes = Vec::new();
 
         serialize_usize(&self.private_attributes(), &mut bytes);
 
@@ -1351,6 +1357,7 @@ mod tests {
         assert_eq!(ProofKappaNu::from_bytes(&bytes).unwrap(), pi_v);
     }
 
+    // test that SetMembershipProof is verified with on single private attribute
     #[test]
     fn set_membership_proof_correctness_1() {
         let params = setup(1).unwrap();
@@ -1361,7 +1368,7 @@ mod tests {
 
         // define one single private attribute
         let private_attribute = 0;
-        let private_attributes = [Scalar::from(private_attribute)];
+        let private_attributes = vec![Scalar::from(private_attribute)];
 
         // issue signatures for the values of the set
         let phi = [
@@ -1388,31 +1395,45 @@ mod tests {
             h * private_key.x + h * (private_key.ys[0] * (Attribute::from(private_attribute))),
         );
 
-        let (_a_prime, r1) = membership_signature.randomise(&params);
-        let (_sigma_prime, r2) = signature.randomise(&params);
+        // randomize signatures
+        let (_, element_blinder) = membership_signature.randomise(&params);
+        let (_, credential_blinder) = signature.randomise(&params);
 
+        // construct set membership proof
         let pi = SetMembershipProof::construct(
             &params,
             &verification_key,
             &sp_verification_key,
+            &element_blinder,
+            &credential_blinder,
             &private_attributes,
-            &r1,
-            &r2,
         );
 
-        let kappa_1 = compute_kappa(&params, &sp_verification_key, &private_attributes, r1);
-        let kappa_2 = compute_kappa(&params, &verification_key, &private_attributes, r2);
+        let element_kappa = compute_kappa(
+            &params,
+            &sp_verification_key,
+            &private_attributes,
+            element_blinder,
+        );
+        let credential_kappa = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder,
+        );
 
-        // this only checks that signatures are "randomized" as they should
+        // this only checks that signatures are "randomized" as they should and proven as they
+        // should
         assert!(pi.verify(
             &params,
             &verification_key,
             &sp_verification_key,
-            &kappa_1,
-            &kappa_2
+            &element_kappa,
+            &credential_kappa
         ));
     }
 
+    // test that SetMembershipProof is verified with two private attributes
     #[test]
     fn set_membership_proof_correctness_2() {
         let params = setup(2).unwrap();
@@ -1421,9 +1442,9 @@ mod tests {
         let sp_private_key = sp_key_pair.secret_key();
         let sp_verification_key = sp_key_pair.verification_key();
 
-        // define two private attributes but only first is used for set membership
+        // define one single private attribute
         let private_attribute = 0;
-        let private_attributes = [Scalar::from(private_attribute), params.random_scalar()];
+        let private_attributes = vec![Scalar::from(private_attribute), params.random_scalar()];
 
         // issue signatures for the values of the set
         let phi = [
@@ -1445,7 +1466,6 @@ mod tests {
         let private_key = key_pair.secret_key();
         let verification_key = key_pair.verification_key();
 
-        // simulate a valid signature on attribute
         let signature = Signature(
             h,
             h * key_pair.secret_key().x
@@ -1453,31 +1473,122 @@ mod tests {
                     + private_key.ys[1] * (Attribute::from(private_attributes[1]))),
         );
 
-        let (_a_prime, r1) = membership_signature.randomise(&params);
-        let (_sigma_prime, r2) = signature.randomise(&params);
+        // randomize signatures
+        let (_, element_blinder) = membership_signature.randomise(&params);
+        let (_, credential_blinder) = signature.randomise(&params);
 
+        // construct set membership proof
         let pi = SetMembershipProof::construct(
             &params,
             &verification_key,
             &sp_verification_key,
+            &element_blinder,
+            &credential_blinder,
             &private_attributes,
-            &r1,
-            &r2,
         );
 
-        let kappa_1 = compute_kappa(&params, &sp_verification_key, &private_attributes, r1);
-        let kappa_2 = compute_kappa(&params, &verification_key, &private_attributes, r2);
+        let element_kappa = compute_kappa(
+            &params,
+            &sp_verification_key,
+            &private_attributes,
+            element_blinder,
+        );
+        let credential_kappa = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder,
+        );
 
-        // this only checks that signatures are "randomized" as they should
+        // this only checks that signatures are "randomized" as they should and proven as they
+        // should
         assert!(pi.verify(
             &params,
             &verification_key,
             &sp_verification_key,
-            &kappa_1,
-            &kappa_2
+            &element_kappa,
+            &credential_kappa
         ));
     }
 
+    // test that SetMembershipProof is verified with on single private attribute and one public one
+    #[test]
+    fn set_membership_proof_correctness_1_1() {
+        let params = setup(2).unwrap();
+        let sp_h = params.gen1() * params.random_scalar();
+        let sp_key_pair = single_attribute_keygen(&params);
+        let sp_private_key = sp_key_pair.secret_key();
+        let sp_verification_key = sp_key_pair.verification_key();
+
+        // define one single private attribute
+        let private_attribute = 0;
+        let private_attributes = vec![Scalar::from(private_attribute)];
+
+        // issue signatures for the values of the set
+        let phi = [
+            RawAttribute::Number(0),
+            RawAttribute::Number(1),
+            RawAttribute::Number(2),
+        ];
+        let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &phi);
+
+        // pick the right signature for attribute
+        let membership_signature = pick_signature(
+            &RawAttribute::Number(private_attribute),
+            &membership_signatures,
+        );
+
+        // simulate a valid signature on attribute
+        let h = params.gen1() * params.random_scalar();
+        let key_pair = keygen(&params);
+        let private_key = key_pair.secret_key();
+        let verification_key = key_pair.verification_key();
+
+        let signature = Signature(
+            h,
+            h * private_key.x + h * (private_key.ys[0] * (Attribute::from(private_attribute))),
+        );
+
+        // randomize signatures
+        let (_, element_blinder) = membership_signature.randomise(&params);
+        let (_, credential_blinder) = signature.randomise(&params);
+
+        // construct set membership proof
+        let pi = SetMembershipProof::construct(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &element_blinder,
+            &credential_blinder,
+            &private_attributes,
+        );
+
+        let element_kappa = compute_kappa(
+            &params,
+            &sp_verification_key,
+            &private_attributes,
+            element_blinder,
+        );
+        let credential_kappa = compute_kappa(
+            &params,
+            &verification_key,
+            &private_attributes,
+            credential_blinder,
+        );
+
+        // this only checks that signatures are "randomized" as they should and proven as they
+        // should
+        assert!(pi.verify(
+            &params,
+            &verification_key,
+            &sp_verification_key,
+            &element_kappa,
+            &credential_kappa
+        ));
+    }
+
+    // test that SetMembershipProof is properly deserialized/serialized with one single private
+    // attribute
     #[test]
     fn set_membership_proof_bytes_roundtrip_1() {
         let params = setup(1).unwrap();
@@ -1486,44 +1597,48 @@ mod tests {
         let sp_verification_key = single_attribute_keygen(&params).verification_key();
         let private_attributes = params.n_random_scalars(1);
 
-        let r1 = params.random_scalar();
-        let r2 = params.random_scalar();
+        let element_blinder = params.random_scalar();
+        let credential_blinder = params.random_scalar();
 
         let pi = SetMembershipProof::construct(
             &params,
             &verification_key,
             &sp_verification_key,
+            &element_blinder,
+            &credential_blinder,
             &private_attributes,
-            &r1,
-            &r2,
         );
 
         assert_eq!(SetMembershipProof::from_bytes(&pi.to_bytes()).unwrap(), pi);
     }
 
+    // test that SetMembershipProof is properly deserialized/serialized with ten private
+    // attributes
     #[test]
     fn set_membership_proof_bytes_roundtrip_10() {
         let params = setup(10).unwrap();
 
         let verification_key = keygen(&params).verification_key();
         let sp_verification_key = single_attribute_keygen(&params).verification_key();
-        let private_attributes = params.n_random_scalars(10);
+        let private_attributes = params.n_random_scalars(1);
 
-        let r1 = params.random_scalar();
-        let r2 = params.random_scalar();
+        let element_blinder = params.random_scalar();
+        let credential_blinder = params.random_scalar();
 
         let pi = SetMembershipProof::construct(
             &params,
             &verification_key,
             &sp_verification_key,
+            &element_blinder,
+            &credential_blinder,
             &private_attributes,
-            &r1,
-            &r2,
         );
 
         assert_eq!(SetMembershipProof::from_bytes(&pi.to_bytes()).unwrap(), pi);
     }
 
+    // test that SetMembershipProof is properly deserialized/serialized with five private
+    // attribute and five public ones
     #[test]
     fn set_membership_proof_bytes_roundtrip_5_5() {
         let params = setup(10).unwrap();
@@ -1532,16 +1647,16 @@ mod tests {
         let sp_verification_key = single_attribute_keygen(&params).verification_key();
         let private_attributes = params.n_random_scalars(5);
 
-        let r1 = params.random_scalar();
-        let r2 = params.random_scalar();
+        let element_blinder = params.random_scalar();
+        let credential_blinder = params.random_scalar();
 
         let pi = SetMembershipProof::construct(
             &params,
             &verification_key,
             &sp_verification_key,
+            &element_blinder,
+            &credential_blinder,
             &private_attributes,
-            &r1,
-            &r2,
         );
 
         assert_eq!(SetMembershipProof::from_bytes(&pi.to_bytes()).unwrap(), pi);

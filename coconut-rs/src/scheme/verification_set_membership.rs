@@ -116,7 +116,7 @@ pub fn prove_credential_and_set_membership(
     sp_verification_key: &VerificationKey,
     signature: &Signature,
     membership_signature: &Signature,
-    private_attributes: &[Attribute],
+    private_attributes: &Vec<Attribute>,
 ) -> Result<SetMembershipTheta> {
     if private_attributes.is_empty() {
         return Err(CoconutError::Verification(
@@ -126,35 +126,40 @@ pub fn prove_credential_and_set_membership(
 
     if private_attributes.len() > verification_key.beta.len() {
         return Err(
-            CoconutError::Verification(
-                format!("Tried to prove a credential for higher than supported by the provided verification key number of attributes (max: {}, requested: {})",
-                        verification_key.beta.len(),
-                        private_attributes.len()
-                )));
+            CoconutError::Verification("Tried to prove a credential for higher than supported by the provided verification key number of attributes.".to_string()));
     }
 
-    let (a_prime, r1) = membership_signature.randomise(&params);
-    let (sigma_prime, r2) = signature.randomise(&params);
+    let (element_randomized_signature, element_blinder) = membership_signature.randomise(&params);
+    let (credential_randomized_signature, credential_blinder) = signature.randomise(&params);
 
-    let kappa_1 = compute_kappa(params, sp_verification_key, private_attributes, r1);
-
-    let kappa_2 = compute_kappa(params, verification_key, private_attributes, r2);
-
-    let pi = SetMembershipProof::construct(
+    let element_kappa = compute_kappa(
         params,
-        verification_key,
         sp_verification_key,
         private_attributes,
-        &r1,
-        &r2,
+        element_blinder,
+    );
+    let credential_kappa = compute_kappa(
+        params,
+        verification_key,
+        private_attributes,
+        credential_blinder,
+    );
+
+    let nizkp = SetMembershipProof::construct(
+        params,
+        &verification_key,
+        &sp_verification_key,
+        &element_blinder,
+        &credential_blinder,
+        &private_attributes,
     );
 
     Ok(SetMembershipTheta {
-        kappa_1,
-        a_prime,
-        kappa_2,
-        sigma_prime,
-        pi,
+        element_randomized_signature,
+        element_kappa,
+        credential_randomized_signature,
+        credential_kappa,
+        nizkp,
     })
 }
 
@@ -165,7 +170,7 @@ pub fn verify_set_membership_credential(
     theta: &SetMembershipTheta,
     public_attributes: &[Attribute],
 ) -> bool {
-    if public_attributes.len() + theta.pi.private_attributes() > verification_key.beta.len() {
+    if public_attributes.len() + theta.nizkp.private_attributes() > verification_key.beta.len() {
         return false;
     }
 
@@ -173,7 +178,9 @@ pub fn verify_set_membership_credential(
         return false;
     }
 
-    if bool::from(theta.a_prime.0.is_identity()) || bool::from(theta.sigma_prime.0.is_identity()) {
+    if bool::from(theta.element_randomized_signature.0.is_identity())
+        || bool::from(theta.credential_randomized_signature.0.is_identity())
+    {
         return false;
     }
 
@@ -183,22 +190,22 @@ pub fn verify_set_membership_credential(
             verification_key
                 .beta
                 .iter()
-                .skip(theta.pi.private_attributes()),
+                .skip(theta.nizkp.private_attributes()),
         )
         .map(|(pub_attr, beta_i)| beta_i * pub_attr)
         .sum::<G2Projective>();
 
-    let kappa_2_all = theta.kappa_2 + signed_public_attributes;
+    let kappa_2_all = theta.credential_kappa + signed_public_attributes;
 
     check_bilinear_pairing(
-        &theta.a_prime.0.to_affine(),
-        &G2Prepared::from(theta.kappa_1.to_affine()),
-        &(theta.a_prime.1).to_affine(),
+        &theta.element_randomized_signature.0.to_affine(),
+        &G2Prepared::from(theta.element_kappa.to_affine()),
+        &(theta.element_randomized_signature.1).to_affine(),
         params.prepared_miller_g2(),
     ) && check_bilinear_pairing(
-        &theta.sigma_prime.0.to_affine(),
+        &theta.credential_randomized_signature.0.to_affine(),
         &G2Prepared::from(kappa_2_all.to_affine()),
-        &(theta.sigma_prime.1).to_affine(),
+        &(theta.credential_randomized_signature.1).to_affine(),
         params.prepared_miller_g2(),
     )
 }
