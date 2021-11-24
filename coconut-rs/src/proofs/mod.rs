@@ -1379,12 +1379,8 @@ mod tests {
         let private_attributes = vec![private_attribute_for_proof];
 
         // issue signatures for the values of the set
-        let phi = [
-            RawAttribute::Number(0),
-            RawAttribute::Number(1),
-            RawAttribute::Number(2),
-        ];
-        let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &phi);
+        let set = (0..10).map(|i| RawAttribute::Number(i as u64)).collect();
+        let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &set);
 
         // pick the right signature for attribute
         let membership_signature =
@@ -1454,12 +1450,8 @@ mod tests {
         let private_attributes = vec![private_attribute_for_proof, params.random_scalar()];
 
         // issue signatures for the values of the set
-        let phi = [
-            RawAttribute::Number(0),
-            RawAttribute::Number(1),
-            RawAttribute::Number(2),
-        ];
-        let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &phi);
+        let set = (0..10).map(|i| RawAttribute::Number(i as u64)).collect();
+        let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &set);
 
         // pick the right signature for attribute
         let membership_signature =
@@ -1531,12 +1523,8 @@ mod tests {
         let private_attributes = vec![private_attribute_for_proof];
 
         // issue signatures for the values of the set
-        let phi = [
-            RawAttribute::Number(0),
-            RawAttribute::Number(1),
-            RawAttribute::Number(2),
-        ];
-        let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &phi);
+        let set = (0..10).map(|i| RawAttribute::Number(i as u64)).collect();
+        let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &set);
 
         // pick the right signature for attribute
         let membership_signature =

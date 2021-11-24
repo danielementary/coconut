@@ -255,11 +255,7 @@ mod tests {
 
         let sp_h = params.gen1() * params.random_scalar();
         let sp_private_key = sp_key_pair.secret_key();
-        let set = [
-            RawAttribute::Number(0),
-            RawAttribute::Number(1),
-            RawAttribute::Number(2),
-        ];
+        let set = (0..10).map(|i| RawAttribute::Number(i as u64)).collect();
         let membership_signature = issue_set_signatures(&sp_h, &sp_private_key, &set);
 
         let private_attributes = vec![Scalar::from(1)];
@@ -297,11 +293,7 @@ mod tests {
 
         let sp_h = params.gen1() * params.random_scalar();
         let sp_private_key = sp_key_pair.secret_key();
-        let set = [
-            RawAttribute::Number(0),
-            RawAttribute::Number(1),
-            RawAttribute::Number(2),
-        ];
+        let set = (0..10).map(|i| RawAttribute::Number(i as u64)).collect();
         let membership_signature = issue_set_signatures(&sp_h, &sp_private_key, &set);
 
         let private_attributes =
@@ -340,11 +332,7 @@ mod tests {
 
         let sp_h = params.gen1() * params.random_scalar();
         let sp_private_key = sp_key_pair.secret_key();
-        let set = [
-            RawAttribute::Number(0),
-            RawAttribute::Number(1),
-            RawAttribute::Number(2),
-        ];
+        let set = (0..10).map(|i| RawAttribute::Number(i as u64)).collect();
         let membership_signature = issue_set_signatures(&sp_h, &sp_private_key, &set);
 
         let private_attributes =

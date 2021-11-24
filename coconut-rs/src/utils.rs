@@ -386,7 +386,7 @@ fn issue_signature(
 pub fn issue_set_signatures(
     h: &G1Projective,
     private_key: &SecretKey,
-    set: &[RawAttribute],
+    set: &Vec<RawAttribute>,
 ) -> ServiceProviderSignatures {
     let signatures: HashMap<RawAttribute, Signature> = set
         .iter()
@@ -764,10 +764,10 @@ mod tests {
         let h = params.gen1() * params.random_scalar();
         let private_key = single_attribute_keygen(&params).secret_key();
 
-        let set_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
+        let set_2 = vec![RawAttribute::Number(0), RawAttribute::Number(1)];
         let membership_signatures_2 = issue_set_signatures(&h, &private_key, &set_2);
 
-        let set_3 = [
+        let set_3 = vec![
             RawAttribute::Number(0),
             RawAttribute::Number(1),
             RawAttribute::Number(2),
@@ -786,7 +786,7 @@ mod tests {
         let private_key = key_pair.secret_key();
         let verification_key = key_pair.verification_key();
 
-        let set_2 = [RawAttribute::Number(0), RawAttribute::Number(1)];
+        let set_2 = vec![RawAttribute::Number(0), RawAttribute::Number(1)];
         let membership_signatures_2 = issue_set_signatures(&h, &private_key, &set_2);
 
         for (m, Signature(s1, s2)) in membership_signatures_2.iter() {
