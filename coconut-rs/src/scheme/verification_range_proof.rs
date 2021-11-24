@@ -414,7 +414,7 @@ pub fn verify_range_credential(
             verification_key
                 .beta
                 .iter()
-                .skip(theta.nizkp.private_attributes()),
+                .skip(theta.nizkp.private_attributes() + 1),
         )
         .map(|(pub_attr, beta_i)| beta_i * pub_attr)
         .sum::<G2Projective>();
