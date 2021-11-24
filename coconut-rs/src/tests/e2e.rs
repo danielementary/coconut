@@ -1,11 +1,8 @@
 use crate::{
     aggregate_signature_shares, aggregate_verification_keys, blind_sign, elgamal_keygen,
-    issue_range_signatures, issue_set_signatures, prepare_blind_sign, prove_credential,
-    prove_credential_and_range, prove_credential_and_set_membership, setup, ttp_keygen,
-    utils::RawAttribute, verify_credential, verify_range_credential,
-    verify_set_membership_credential, CoconutError, Signature, SignatureShare, VerificationKey,
+    prepare_blind_sign, prove_credential, setup, ttp_keygen, verify_credential, CoconutError,
+    Signature, SignatureShare, VerificationKey,
 };
-use bls12_381::Scalar;
 
 #[test]
 fn main() -> Result<(), CoconutError> {
