@@ -1,13 +1,12 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use core::time::Duration;
-
 use bls12_381::Scalar;
 
 use coconut_rs::{
-    aggregate_signature_shares, aggregate_verification_keys, blind_sign, elgamal_keygen,
-    issue_membership_signatures, issue_range_signatures, prepare_blind_sign, prove_credential,
-    prove_credential_and_range, prove_credential_and_set_membership, setup, ttp_keygen,
+    aggregate_signature_shares, aggregate_verification_keys, blind_sign, default_base_u,
+    default_number_of_base_elements_l, elgamal_keygen, issue_range_signatures,
+    issue_set_signatures, prepare_blind_sign, prove_credential, prove_credential_and_range,
+    prove_credential_and_set_membership, setup, single_attribute_keygen, ttp_keygen,
     verify_credential, verify_range_credential, verify_set_membership_credential, RawAttribute,
     Signature, SignatureShare, VerificationKey,
 };
@@ -94,7 +93,7 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
             .unwrap();
 
     // benchmark prove credential
-    c.bench_function("prove credential", |b| {
+    c.bench_function("prove credential no proof", |b| {
         b.iter(|| prove_credential(&params, &verification_key, &signature, &private_attributes));
     });
 
@@ -103,27 +102,19 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
         prove_credential(&params, &verification_key, &signature, &private_attributes).unwrap();
 
     // benchmark verify credential
-    c.bench_function("verify credential", |b| {
+    c.bench_function("verify credential no proof", |b| {
         b.iter(|| verify_credential(&params, &verification_key, &theta, &public_attributes));
     });
 
-    // setup for set membership proof
+    //setup with set membership proof
     let params = setup(1).unwrap();
 
     // build dummy private attribute 1
     let private_attribute = 1;
-    let private_attributes = [RawAttribute::Number(private_attribute).into()];
+    let private_attributes = vec![RawAttribute::Number(private_attribute).into()];
     let public_attributes = params.n_random_scalars(0);
 
     let elgamal_keypair = elgamal_keygen(&params);
-
-    // issue signatures for 0, 1 and 2
-    let set = [
-        RawAttribute::Number(0),
-        RawAttribute::Number(1),
-        RawAttribute::Number(2),
-    ];
-    let membership_signatures = issue_membership_signatures(&params, &set);
 
     // generate commitment and encryption
     let blind_sign_request = prepare_blind_sign(
@@ -136,7 +127,6 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
 
     // generate_keys
     let coconut_keypairs = ttp_keygen(&params, 2, 3).unwrap();
-
     let verification_keys: Vec<VerificationKey> = coconut_keypairs
         .iter()
         .map(|keypair| keypair.verification_key())
@@ -148,7 +138,6 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
 
     // generate blinded signatures
     let mut blinded_signatures = Vec::new();
-
     for keypair in coconut_keypairs {
         let blinded_signature = blind_sign(
             &params,
@@ -194,40 +183,47 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
         aggregate_signature_shares(&params, &verification_key, &attributes, &signature_shares)
             .unwrap();
 
-    // pick the membership signature corresponding to the private attribute
-    let membership_signature = membership_signatures
-        .signatures
-        .get(&RawAttribute::Number(private_attribute))
-        .unwrap();
-    let sp_verification_key = membership_signatures.sp_verification_key;
+    let sp_h = params.gen1() * params.random_scalar();
+    let sp_key_pair = single_attribute_keygen(&params);
+    let sp_private_key = sp_key_pair.secret_key();
+    let set = (0..10).map(|i| RawAttribute::Number(i as u64)).collect();
 
-    // benchmark prove credential and set membership
-    c.bench_function("prove credential and set membership", |b| {
+    // benchmark signature issuance
+    c.bench_function("issue 10 signatures", |b| {
+        b.iter(|| issue_set_signatures(&sp_h, &sp_private_key, &set));
+    });
+
+    let sp_signatures = issue_set_signatures(&sp_h, &sp_private_key, &set);
+
+    let sp_verification_key = sp_key_pair.verification_key();
+
+    // benchmark prove credential
+    c.bench_function("prove credential with set membership proof", |b| {
         b.iter(|| {
             prove_credential_and_set_membership(
                 &params,
                 &verification_key,
                 &sp_verification_key,
                 &signature,
-                &membership_signature,
+                &sp_signatures,
                 &private_attributes,
             )
         });
     });
 
-    // Randomize credentials and generate any cryptographic material to verify them
+    // Generate cryptographic material to verify them
     let theta = prove_credential_and_set_membership(
         &params,
         &verification_key,
         &sp_verification_key,
         &signature,
-        &membership_signature,
+        &sp_signatures,
         &private_attributes,
     )
     .unwrap();
 
     // benchmark verify credential
-    c.bench_function("verify credential and set membership", |b| {
+    c.bench_function("verify credential with set membership proof", |b| {
         b.iter(|| {
             verify_set_membership_credential(
                 &params,
@@ -239,20 +235,15 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
         });
     });
 
-    // setup for range proof
+    // setup with range proof
     let params = setup(1).unwrap();
 
-    // build dummy private attribute 1
+    // build dummy private attribute 10
     let private_attribute = 10;
-    let private_attributes = [RawAttribute::Number(private_attribute).into()];
+    let private_attributes = vec![RawAttribute::Number(private_attribute).into()];
     let public_attributes = params.n_random_scalars(0);
 
     let elgamal_keypair = elgamal_keygen(&params);
-
-    // issue range signatures for element 0..U-1
-    let a = Scalar::from(5);
-    let b = Scalar::from(15);
-    let range_signatures = issue_range_signatures(&params);
 
     // generate commitment and encryption
     let blind_sign_request = prepare_blind_sign(
@@ -265,7 +256,6 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
 
     // generate_keys
     let coconut_keypairs = ttp_keygen(&params, 2, 3).unwrap();
-
     let verification_keys: Vec<VerificationKey> = coconut_keypairs
         .iter()
         .map(|keypair| keypair.verification_key())
@@ -277,7 +267,6 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
 
     // generate blinded signatures
     let mut blinded_signatures = Vec::new();
-
     for keypair in coconut_keypairs {
         let blinded_signature = blind_sign(
             &params,
@@ -323,39 +312,61 @@ pub fn bench_e2e_runs(c: &mut Criterion) {
         aggregate_signature_shares(&params, &verification_key, &attributes, &signature_shares)
             .unwrap();
 
-    let sp_verification_key = &range_signatures.sp_verification_key;
+    // parameters
+    let base_u = default_base_u();
+    let number_of_base_elements_l = default_number_of_base_elements_l();
 
-    // benchmark prove credential and range proof
-    c.bench_function("prove credential and range proof", |b2| {
-        b2.iter(|| {
+    let lower_bound = Scalar::from(5);
+    let upper_bound = Scalar::from(15);
+
+    let sp_h = params.gen1() * params.random_scalar();
+    let sp_key_pair = single_attribute_keygen(&params);
+    let sp_private_key = sp_key_pair.secret_key();
+
+    // benchmark signature issuance
+    c.bench_function("issue U (default 4) signatures", |b| {
+        b.iter(|| issue_range_signatures(&sp_h, &sp_private_key, 0, base_u));
+    });
+
+    let sp_signatures = issue_range_signatures(&sp_h, &sp_private_key, 0, base_u);
+
+    let sp_verification_key = sp_key_pair.verification_key();
+
+    // benchmark prove credential
+    c.bench_function("prove credential with range proof", |b| {
+        b.iter(|| {
             prove_credential_and_range(
                 &params,
+                base_u,
+                number_of_base_elements_l,
+                lower_bound,
+                upper_bound,
                 &verification_key,
                 &sp_verification_key,
                 &signature,
-                &range_signatures,
-                a,
-                b,
+                &sp_signatures,
                 &private_attributes,
             )
         });
     });
 
-    // Randomize credentials and generate any cryptographic material to verify them
+    // Generate cryptographic material to verify them
     let theta = prove_credential_and_range(
         &params,
+        base_u,
+        number_of_base_elements_l,
+        lower_bound,
+        upper_bound,
         &verification_key,
         &sp_verification_key,
         &signature,
-        &range_signatures,
-        a,
-        b,
+        &sp_signatures,
         &private_attributes,
     )
     .unwrap();
 
     // benchmark verify credential
-    c.bench_function("verify credential and set membership", |b| {
+    c.bench_function("verify credential with range proof", |b| {
         b.iter(|| {
             verify_range_credential(
                 &params,
