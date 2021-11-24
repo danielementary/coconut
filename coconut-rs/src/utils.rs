@@ -416,11 +416,14 @@ pub fn issue_range_signatures(
     issue_set_signatures(&h, &private_key, &set)
 }
 
-pub fn pick_signature(
-    attribute: &RawAttribute,
+pub fn pick_signature_for_element(
+    attribute: &Scalar,
     signatures: &ServiceProviderSignatures,
 ) -> Signature {
-    signatures.get(attribute).unwrap().clone()
+    signatures
+        .get(&RawAttribute::Number(scalar_to_u64(attribute)))
+        .unwrap()
+        .clone()
 }
 
 pub fn pick_signatures_for_decomposition(
@@ -429,12 +432,7 @@ pub fn pick_signatures_for_decomposition(
 ) -> Vec<Signature> {
     decomposition
         .iter()
-        .map(|base_elements_i| {
-            pick_signature(
-                &RawAttribute::Number(scalar_to_u64(base_elements_i)),
-                signatures,
-            )
-        })
+        .map(|base_elements_i| pick_signature_for_element(base_elements_i, signatures))
         .collect()
 }
 

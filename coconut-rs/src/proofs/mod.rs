@@ -1258,7 +1258,7 @@ mod tests {
     use crate::utils::{
         compute_u_ary_decomposition, default_base_u, default_max,
         default_number_of_base_elements_l, issue_range_signatures, issue_set_signatures,
-        pick_signature, pick_signatures_for_decomposition,
+        pick_signature_for_element, pick_signatures_for_decomposition,
     };
 
     use crate::utils::RawAttribute;
@@ -1375,7 +1375,8 @@ mod tests {
 
         // define one single private attribute
         let private_attribute = 0;
-        let private_attributes = vec![Scalar::from(private_attribute)];
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+        let private_attributes = vec![private_attribute_for_proof];
 
         // issue signatures for the values of the set
         let phi = [
@@ -1386,10 +1387,8 @@ mod tests {
         let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &phi);
 
         // pick the right signature for attribute
-        let membership_signature = pick_signature(
-            &RawAttribute::Number(private_attribute),
-            &membership_signatures,
-        );
+        let membership_signature =
+            pick_signature_for_element(&private_attribute_for_proof, &membership_signatures);
 
         // simulate a valid signature on attribute
         let h = params.gen1() * params.random_scalar();
@@ -1451,7 +1450,8 @@ mod tests {
 
         // define one single private attribute
         let private_attribute = 0;
-        let private_attributes = vec![Scalar::from(private_attribute), params.random_scalar()];
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+        let private_attributes = vec![private_attribute_for_proof, params.random_scalar()];
 
         // issue signatures for the values of the set
         let phi = [
@@ -1462,10 +1462,8 @@ mod tests {
         let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &phi);
 
         // pick the right signature for attribute
-        let membership_signature = pick_signature(
-            &RawAttribute::Number(private_attribute),
-            &membership_signatures,
-        );
+        let membership_signature =
+            pick_signature_for_element(&private_attribute_for_proof, &membership_signatures);
 
         // simulate a valid signature on attribute
         let h = params.gen1() * params.random_scalar();
@@ -1529,7 +1527,8 @@ mod tests {
 
         // define one single private attribute
         let private_attribute = 0;
-        let private_attributes = vec![Scalar::from(private_attribute)];
+        let private_attribute_for_proof = Scalar::from(private_attribute);
+        let private_attributes = vec![private_attribute_for_proof];
 
         // issue signatures for the values of the set
         let phi = [
@@ -1540,10 +1539,8 @@ mod tests {
         let membership_signatures = issue_set_signatures(&sp_h, &sp_private_key, &phi);
 
         // pick the right signature for attribute
-        let membership_signature = pick_signature(
-            &RawAttribute::Number(private_attribute),
-            &membership_signatures,
-        );
+        let membership_signature =
+            pick_signature_for_element(&private_attribute_for_proof, &membership_signatures);
 
         // simulate a valid signature on attribute
         let h = params.gen1() * params.random_scalar();
