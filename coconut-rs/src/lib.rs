@@ -55,11 +55,13 @@ pub use scheme::BlindedSignature;
 pub use scheme::Signature;
 pub use scheme::SignatureShare;
 pub use traits::Base58;
+pub use utils::compute_u_ary_decomposition;
 pub use utils::default_base_u;
 pub use utils::default_number_of_base_elements_l;
 pub use utils::hash_to_scalar;
 pub use utils::issue_range_signatures;
 pub use utils::issue_set_signatures;
+pub use utils::pick_signatures_for_decomposition;
 pub use utils::RawAttribute;
 
 pub type Attribute = Scalar;

@@ -8,9 +8,10 @@ use rand::Rng;
 
 use bls12_381::Scalar;
 use coconut_rs::{
-    compute_u_ary_decomposition, issue_membership_signatures, issue_range_signatures, keygen,
-    pick_range_signatures, prove_credential_and_range, prove_credential_and_set_membership, setup,
-    single_attribute_keygen, RangeTheta, RawAttribute, SetMembershipTheta, L, U,
+    compute_u_ary_decomposition, default_base_u, default_number_of_base_elements_l,
+    issue_range_signatures, issue_set_signatures, keygen, pick_signatures_for_decomposition,
+    prove_credential_and_range, prove_credential_and_set_membership, setup,
+    single_attribute_keygen, RangeTheta, RawAttribute, SetMembershipTheta,
 };
 
 pub fn bench_proofs_functions(c: &mut Criterion) {
