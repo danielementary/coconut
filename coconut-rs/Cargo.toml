@@ -48,6 +48,18 @@ harness = false
 name = "benchmarks_e2e"
 harness = false
 
+[[bench]]
+name = "final_benchmark_proof_none"
+harness = false
+
+[[bench]]
+name = "final_benchmark_proof_range"
+harness = false
+
+[[bench]]
+name = "final_benchmark_proof_set"
+harness = false
+
 [features]
 default = []
 
