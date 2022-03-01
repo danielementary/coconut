@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use std::time::Duration;
 
 use bls12_381::Scalar;
 
@@ -12,6 +13,7 @@ use coconut_rs::{
 pub fn bench_e2e_runs(c: &mut Criterion) {
     let mut c = c.benchmark_group("sample_size");
     c.sample_size(10);
+    c.measurement_time(Duration::from_secs(25));
 
     let params = setup(1).unwrap();
 

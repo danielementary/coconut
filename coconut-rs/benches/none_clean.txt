@@ -1,0 +1,17 @@
+Benchmarking sample_size/Proof
+Benchmarking sample_size/Proof: Warming up for 3.0000 s
+Benchmarking sample_size/Proof: Collecting 10 samples in estimated 25.162 s (2035 iterations)
+Benchmarking sample_size/Proof: Analyzing
+sample_size/Proof       time:   [11.151 ms 12.953 ms 15.328 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+theta length 296 bytes
+Benchmarking sample_size/Verification
+Benchmarking sample_size/Verification: Warming up for 3.0000 s
+Benchmarking sample_size/Verification: Collecting 10 samples in estimated 25.511 s (1705 iterations)
+Benchmarking sample_size/Verification: Analyzing
+sample_size/Verification
+                        time:   [16.892 ms 21.274 ms 24.447 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+

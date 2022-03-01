@@ -1,0 +1,32 @@
+sample_size/Issuance 10 time:   [23.557 ms 31.093 ms 41.244 ms]
+sample_size/Proof 10    time:   [27.514 ms 34.001 ms 39.961 ms]
+theta 10 length 680 bytes
+sample_size/Verification 10
+                        time:   [39.024 ms 45.731 ms 51.290 ms]
+
+sample_size/Issuance 50 time:   [123.55 ms 140.21 ms 158.52 ms]
+sample_size/Proof 50    time:   [28.892 ms 35.050 ms 42.471 ms]
+theta 50 length 680 bytes
+sample_size/Verification 50
+                        time:   [33.899 ms 43.545 ms 50.565 ms]
+
+sample_size/Issuance 100
+                        time:   [211.49 ms 238.06 ms 283.57 ms]
+sample_size/Proof 100   time:   [25.647 ms 30.183 ms 37.806 ms]
+theta 100 length 680 bytes
+sample_size/Verification 100
+                        time:   [34.017 ms 37.656 ms 42.141 ms]
+
+sample_size/Issuance 500
+                        time:   [1.0643 s 1.2192 s 1.4454 s]
+sample_size/Proof 500   time:   [26.864 ms 33.375 ms 44.681 ms]
+theta 500 length 680 bytes
+sample_size/Verification 500
+                        time:   [33.798 ms 34.048 ms 34.581 ms]
+
+sample_size/Issuance 1000
+                        time:   [2.1133 s 2.3642 s 2.7116 s]
+sample_size/Proof 1000  time:   [25.376 ms 26.009 ms 27.921 ms]
+theta 1000 length 680 bytes
+sample_size/Verification 1000
+                        time:   [33.950 ms 35.564 ms 40.312 ms]

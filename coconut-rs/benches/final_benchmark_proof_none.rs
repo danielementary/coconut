@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use std::time::Duration;
 
 use coconut_rs::{
     aggregate_signature_shares, aggregate_verification_keys, blind_sign, elgamal_keygen,
@@ -7,6 +8,10 @@ use coconut_rs::{
 };
 
 fn e2e_proof_none(c: &mut Criterion) {
+    let mut c = c.benchmark_group("sample_size");
+    c.sample_size(10);
+    c.measurement_time(Duration::from_secs(25));
+
     let params = setup(1).unwrap();
 
     let private_attributes = params.n_random_scalars(1);

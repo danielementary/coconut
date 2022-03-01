@@ -1,0 +1,467 @@
+Benchmarking sample_size/BASE 2 Issuance 10
+Benchmarking sample_size/BASE 2 Issuance 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Issuance 10: Collecting 10 samples in estimated 25.062 s (3300 iterations)
+Benchmarking sample_size/BASE 2 Issuance 10: Analyzing
+sample_size/BASE 2 Issuance 10
+                        time:   [5.2543 ms 6.2966 ms 7.2846 ms]
+                        change: [+147.44% +191.32% +252.24%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking sample_size/BASE 2 Proof 10
+Benchmarking sample_size/BASE 2 Proof 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Proof 10: Collecting 10 samples in estimated 25.390 s (110 iterations)
+Benchmarking sample_size/BASE 2 Proof 10: Analyzing
+sample_size/BASE 2 Proof 10
+                        time:   [180.89 ms 204.30 ms 261.65 ms]
+                        change: [+119.91% +181.95% +253.63%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+theta 10 length 3624 bytes
+Benchmarking sample_size/BASE 2 Verification 10
+Benchmarking sample_size/BASE 2 Verification 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Verification 10: Collecting 10 samples in estimated 32.724 s (110 iterations)
+Benchmarking sample_size/BASE 2 Verification 10: Analyzing
+sample_size/BASE 2 Verification 10
+                        time:   [233.11 ms 266.10 ms 309.24 ms]
+                        change: [+69.243% +108.65% +156.53%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking sample_size/BASE 2 Issuance 50
+Benchmarking sample_size/BASE 2 Issuance 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Issuance 50: Collecting 10 samples in estimated 25.025 s (3630 iterations)
+Benchmarking sample_size/BASE 2 Issuance 50: Analyzing
+sample_size/BASE 2 Issuance 50
+                        time:   [4.6713 ms 5.5467 ms 6.6180 ms]
+                        change: [+64.064% +84.875% +114.39%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 2 Proof 50
+Benchmarking sample_size/BASE 2 Proof 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Proof 50: Collecting 10 samples in estimated 29.344 s (110 iterations)
+Benchmarking sample_size/BASE 2 Proof 50: Analyzing
+sample_size/BASE 2 Proof 50
+                        time:   [265.10 ms 312.06 ms 374.78 ms]
+                        change: [+43.082% +69.751% +100.60%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 3 outliers among 10 measurements (30.00%)
+  1 (10.00%) low mild
+  2 (20.00%) high severe
+theta 50 length 5032 bytes
+Benchmarking sample_size/BASE 2 Verification 50
+Benchmarking sample_size/BASE 2 Verification 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Verification 50: Collecting 10 samples in estimated 40.454 s (110 iterations)
+Benchmarking sample_size/BASE 2 Verification 50: Analyzing
+sample_size/BASE 2 Verification 50
+                        time:   [315.31 ms 351.95 ms 426.65 ms]
+                        change: [+49.733% +76.590% +115.87%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking sample_size/BASE 2 Issuance 100
+Benchmarking sample_size/BASE 2 Issuance 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Issuance 100: Collecting 10 samples in estimated 25.326 s (3850 iterations)
+Benchmarking sample_size/BASE 2 Issuance 100: Analyzing
+sample_size/BASE 2 Issuance 100
+                        time:   [4.2332 ms 4.5047 ms 5.2333 ms]
+                        change: [+51.749% +89.162% +137.72%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking sample_size/BASE 2 Proof 100
+Benchmarking sample_size/BASE 2 Proof 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Proof 100: Collecting 10 samples in estimated 45.641 s (110 iterations)
+Benchmarking sample_size/BASE 2 Proof 100: Analyzing
+sample_size/BASE 2 Proof 100
+                        time:   [274.35 ms 300.33 ms 343.91 ms]
+                        change: [+50.152% +62.928% +78.831%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+theta 100 length 5736 bytes
+Benchmarking sample_size/BASE 2 Verification 100
+Benchmarking sample_size/BASE 2 Verification 100: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 25.0s. You may wish to increase target time to 28.4s or enable flat sampling.
+Benchmarking sample_size/BASE 2 Verification 100: Collecting 10 samples in estimated 28.431 s (55 iterations)
+Benchmarking sample_size/BASE 2 Verification 100: Analyzing
+sample_size/BASE 2 Verification 100
+                        time:   [347.47 ms 399.23 ms 467.81 ms]
+                        change: [+50.692% +63.843% +86.406%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 2 Issuance 500
+Benchmarking sample_size/BASE 2 Issuance 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Issuance 500: Collecting 10 samples in estimated 25.097 s (5720 iterations)
+Benchmarking sample_size/BASE 2 Issuance 500: Analyzing
+sample_size/BASE 2 Issuance 500
+                        time:   [4.2459 ms 5.3295 ms 6.8644 ms]
+                        change: [+48.963% +67.460% +99.906%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 2 Proof 500
+Benchmarking sample_size/BASE 2 Proof 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Proof 500: Collecting 10 samples in estimated 39.482 s (110 iterations)
+Benchmarking sample_size/BASE 2 Proof 500: Analyzing
+sample_size/BASE 2 Proof 500
+                        time:   [387.64 ms 427.46 ms 452.62 ms]
+                        change: [+57.215% +73.684% +90.421%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+theta 500 length 7144 bytes
+Benchmarking sample_size/BASE 2 Verification 500
+Benchmarking sample_size/BASE 2 Verification 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Verification 500: Collecting 10 samples in estimated 30.643 s (30 iterations)
+Benchmarking sample_size/BASE 2 Verification 500: Analyzing
+sample_size/BASE 2 Verification 500
+                        time:   [437.41 ms 543.84 ms 655.35 ms]
+                        change: [+58.802% +86.850% +130.57%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking sample_size/BASE 2 Issuance 1000
+Benchmarking sample_size/BASE 2 Issuance 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Issuance 1000: Collecting 10 samples in estimated 25.230 s (5720 iterations)
+Benchmarking sample_size/BASE 2 Issuance 1000: Analyzing
+sample_size/BASE 2 Issuance 1000
+                        time:   [4.3205 ms 5.1526 ms 6.2073 ms]
+                        change: [+55.615% +72.595% +94.472%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking sample_size/BASE 2 Proof 1000
+Benchmarking sample_size/BASE 2 Proof 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 2 Proof 1000: Collecting 10 samples in estimated 42.829 s (110 iterations)
+Benchmarking sample_size/BASE 2 Proof 1000: Analyzing
+sample_size/BASE 2 Proof 1000
+                        time:   [384.70 ms 442.36 ms 504.75 ms]
+                        change: [+52.311% +73.845% +96.857%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+theta 1000 length 7848 bytes
+Benchmarking sample_size/BASE 2 Verification 1000
+Benchmarking sample_size/BASE 2 Verification 1000: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 25.0s. You may wish to increase target time to 27.3s or enable flat sampling.
+Benchmarking sample_size/BASE 2 Verification 1000: Collecting 10 samples in estimated 27.265 s (55 iterations)
+Benchmarking sample_size/BASE 2 Verification 1000: Analyzing
+sample_size/BASE 2 Verification 1000
+                        time:   [422.04 ms 495.06 ms 626.92 ms]
+                        change: [+42.960% +56.938% +78.603%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 3 outliers among 10 measurements (30.00%)
+  2 (20.00%) low mild
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 3 Issuance 10
+Benchmarking sample_size/BASE 3 Issuance 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Issuance 10: Collecting 10 samples in estimated 25.113 s (4235 iterations)
+Benchmarking sample_size/BASE 3 Issuance 10: Analyzing
+sample_size/BASE 3 Issuance 10
+                        time:   [5.3684 ms 5.4669 ms 5.7714 ms]
+                        change: [+25.665% +64.177% +111.98%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 3 Proof 10
+Benchmarking sample_size/BASE 3 Proof 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Proof 10: Collecting 10 samples in estimated 26.032 s (220 iterations)
+Benchmarking sample_size/BASE 3 Proof 10: Analyzing
+sample_size/BASE 3 Proof 10
+                        time:   [125.40 ms 140.36 ms 167.64 ms]
+                        change: [+44.461% +58.367% +78.245%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+theta 10 length 2920 bytes
+Benchmarking sample_size/BASE 3 Verification 10
+Benchmarking sample_size/BASE 3 Verification 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Verification 10: Collecting 10 samples in estimated 26.661 s (165 iterations)
+Benchmarking sample_size/BASE 3 Verification 10: Analyzing
+sample_size/BASE 3 Verification 10
+                        time:   [151.63 ms 177.01 ms 209.25 ms]
+                        change: [+32.500% +45.378% +62.380%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking sample_size/BASE 3 Issuance 50
+Benchmarking sample_size/BASE 3 Issuance 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Issuance 50: Collecting 10 samples in estimated 25.141 s (4015 iterations)
+Benchmarking sample_size/BASE 3 Issuance 50: Analyzing
+sample_size/BASE 3 Issuance 50
+                        time:   [5.7233 ms 6.6891 ms 8.0111 ms]
+                        change: [+38.858% +50.461% +66.617%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 3 Proof 50
+Benchmarking sample_size/BASE 3 Proof 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Proof 50: Collecting 10 samples in estimated 32.358 s (220 iterations)
+Benchmarking sample_size/BASE 3 Proof 50: Analyzing
+sample_size/BASE 3 Proof 50
+                        time:   [147.74 ms 163.83 ms 184.53 ms]
+                        change: [+30.902% +41.930% +55.952%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+theta 50 length 3624 bytes
+Benchmarking sample_size/BASE 3 Verification 50
+Benchmarking sample_size/BASE 3 Verification 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Verification 50: Collecting 10 samples in estimated 30.529 s (165 iterations)
+Benchmarking sample_size/BASE 3 Verification 50: Analyzing
+sample_size/BASE 3 Verification 50
+                        time:   [180.87 ms 189.19 ms 211.41 ms]
+                        change: [+25.668% +38.249% +59.422%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 3 Issuance 100
+Benchmarking sample_size/BASE 3 Issuance 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Issuance 100: Collecting 10 samples in estimated 25.222 s (4235 iterations)
+Benchmarking sample_size/BASE 3 Issuance 100: Analyzing
+sample_size/BASE 3 Issuance 100
+                        time:   [5.3541 ms 5.4412 ms 5.7078 ms]
+                        change: [+24.900% +60.601% +116.89%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 3 Proof 100
+Benchmarking sample_size/BASE 3 Proof 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Proof 100: Collecting 10 samples in estimated 36.512 s (165 iterations)
+Benchmarking sample_size/BASE 3 Proof 100: Analyzing
+sample_size/BASE 3 Proof 100
+                        time:   [198.07 ms 212.08 ms 243.72 ms]
+                        change: [+49.158% +73.562% +104.28%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+theta 100 length 4328 bytes
+Benchmarking sample_size/BASE 3 Verification 100
+Benchmarking sample_size/BASE 3 Verification 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Verification 100: Collecting 10 samples in estimated 47.584 s (110 iterations)
+Benchmarking sample_size/BASE 3 Verification 100: Analyzing
+sample_size/BASE 3 Verification 100
+                        time:   [252.45 ms 260.20 ms 270.79 ms]
+                        change: [+47.015% +67.550% +100.64%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 3 Issuance 500
+Benchmarking sample_size/BASE 3 Issuance 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Issuance 500: Collecting 10 samples in estimated 25.039 s (3850 iterations)
+Benchmarking sample_size/BASE 3 Issuance 500: Analyzing
+sample_size/BASE 3 Issuance 500
+                        time:   [5.9413 ms 6.6710 ms 8.0147 ms]
+                        change: [+44.995% +67.721% +103.27%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 3 Proof 500
+Benchmarking sample_size/BASE 3 Proof 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Proof 500: Collecting 10 samples in estimated 29.064 s (110 iterations)
+Benchmarking sample_size/BASE 3 Proof 500: Analyzing
+sample_size/BASE 3 Proof 500
+                        time:   [213.37 ms 249.20 ms 295.24 ms]
+                        change: [+38.857% +50.544% +67.669%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+theta 500 length 5032 bytes
+Benchmarking sample_size/BASE 3 Verification 500
+Benchmarking sample_size/BASE 3 Verification 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Verification 500: Collecting 10 samples in estimated 28.780 s (110 iterations)
+Benchmarking sample_size/BASE 3 Verification 500: Analyzing
+sample_size/BASE 3 Verification 500
+                        time:   [253.15 ms 276.96 ms 327.22 ms]
+                        change: [+25.271% +33.068% +47.097%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 3 Issuance 1000
+Benchmarking sample_size/BASE 3 Issuance 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Issuance 1000: Collecting 10 samples in estimated 25.065 s (4565 iterations)
+Benchmarking sample_size/BASE 3 Issuance 1000: Analyzing
+sample_size/BASE 3 Issuance 1000
+                        time:   [5.3187 ms 5.8199 ms 6.5065 ms]
+                        change: [+21.610% +30.088% +40.560%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 3 Proof 1000
+Benchmarking sample_size/BASE 3 Proof 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Proof 1000: Collecting 10 samples in estimated 26.791 s (110 iterations)
+Benchmarking sample_size/BASE 3 Proof 1000: Analyzing
+sample_size/BASE 3 Proof 1000
+                        time:   [228.75 ms 255.13 ms 301.39 ms]
+                        change: [+25.524% +32.944% +46.762%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+theta 1000 length 5736 bytes
+Benchmarking sample_size/BASE 3 Verification 1000
+Benchmarking sample_size/BASE 3 Verification 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 3 Verification 1000: Collecting 10 samples in estimated 32.578 s (110 iterations)
+Benchmarking sample_size/BASE 3 Verification 1000: Analyzing
+sample_size/BASE 3 Verification 1000
+                        time:   [291.01 ms 318.17 ms 366.35 ms]
+                        change: [+7.3105% +18.244% +30.993%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 4 Issuance 10
+Benchmarking sample_size/BASE 4 Issuance 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Issuance 10: Collecting 10 samples in estimated 25.316 s (3410 iterations)
+Benchmarking sample_size/BASE 4 Issuance 10: Analyzing
+sample_size/BASE 4 Issuance 10
+                        time:   [7.0881 ms 7.8510 ms 8.9781 ms]
+                        change: [+23.525% +29.233% +39.920%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 4 Proof 10
+Benchmarking sample_size/BASE 4 Proof 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Proof 10: Collecting 10 samples in estimated 27.664 s (330 iterations)
+Benchmarking sample_size/BASE 4 Proof 10: Analyzing
+sample_size/BASE 4 Proof 10
+                        time:   [80.830 ms 89.589 ms 101.78 ms]
+                        change: [+24.305% +30.072% +39.801%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+theta 10 length 2216 bytes
+Benchmarking sample_size/BASE 4 Verification 10
+Benchmarking sample_size/BASE 4 Verification 10: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Verification 10: Collecting 10 samples in estimated 30.573 s (275 iterations)
+Benchmarking sample_size/BASE 4 Verification 10: Analyzing
+sample_size/BASE 4 Verification 10
+                        time:   [105.92 ms 116.76 ms 132.79 ms]
+                        change: [+24.597% +30.627% +41.099%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 4 Issuance 50
+Benchmarking sample_size/BASE 4 Issuance 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Issuance 50: Collecting 10 samples in estimated 25.296 s (3410 iterations)
+Benchmarking sample_size/BASE 4 Issuance 50: Analyzing
+sample_size/BASE 4 Issuance 50
+                        time:   [7.0806 ms 7.9311 ms 9.4262 ms]
+                        change: [+24.273% +31.940% +46.526%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 4 Proof 50
+Benchmarking sample_size/BASE 4 Proof 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Proof 50: Collecting 10 samples in estimated 25.516 s (220 iterations)
+Benchmarking sample_size/BASE 4 Proof 50: Analyzing
+sample_size/BASE 4 Proof 50
+                        time:   [110.45 ms 110.68 ms 110.88 ms]
+                        change: [+23.883% +24.834% +25.819%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+theta 50 length 2920 bytes
+Benchmarking sample_size/BASE 4 Verification 50
+Benchmarking sample_size/BASE 4 Verification 50: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Verification 50: Collecting 10 samples in estimated 32.391 s (220 iterations)
+Benchmarking sample_size/BASE 4 Verification 50: Analyzing
+sample_size/BASE 4 Verification 50
+                        time:   [142.84 ms 148.01 ms 161.87 ms]
+                        change: [+25.032% +38.362% +58.409%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 4 Issuance 100
+Benchmarking sample_size/BASE 4 Issuance 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Issuance 100: Collecting 10 samples in estimated 25.163 s (2530 iterations)
+Benchmarking sample_size/BASE 4 Issuance 100: Analyzing
+sample_size/BASE 4 Issuance 100
+                        time:   [7.1169 ms 7.1706 ms 7.3217 ms]
+                        change: [+24.928% +48.137% +93.838%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 4 Proof 100
+Benchmarking sample_size/BASE 4 Proof 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Proof 100: Collecting 10 samples in estimated 32.081 s (220 iterations)
+Benchmarking sample_size/BASE 4 Proof 100: Analyzing
+sample_size/BASE 4 Proof 100
+                        time:   [139.79 ms 146.57 ms 166.80 ms]
+                        change: [+23.766% +33.330% +51.641%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high severe
+theta 100 length 3624 bytes
+Benchmarking sample_size/BASE 4 Verification 100
+Benchmarking sample_size/BASE 4 Verification 100: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Verification 100: Collecting 10 samples in estimated 30.221 s (165 iterations)
+Benchmarking sample_size/BASE 4 Verification 100: Analyzing
+sample_size/BASE 4 Verification 100
+                        time:   [179.57 ms 186.73 ms 209.71 ms]
+                        change: [+25.092% +37.964% +60.279%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+Benchmarking sample_size/BASE 4 Issuance 500
+Benchmarking sample_size/BASE 4 Issuance 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Issuance 500: Collecting 10 samples in estimated 25.228 s (3410 iterations)
+Benchmarking sample_size/BASE 4 Issuance 500: Analyzing
+sample_size/BASE 4 Issuance 500
+                        time:   [7.0916 ms 7.5528 ms 8.8094 ms]
+                        change: [+24.022% +33.193% +51.007%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 4 Proof 500
+Benchmarking sample_size/BASE 4 Proof 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Proof 500: Collecting 10 samples in estimated 28.963 s (165 iterations)
+Benchmarking sample_size/BASE 4 Proof 500: Analyzing
+sample_size/BASE 4 Proof 500
+                        time:   [169.95 ms 181.12 ms 208.02 ms]
+                        change: [+25.292% +32.227% +44.955%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+theta 500 length 4328 bytes
+Benchmarking sample_size/BASE 4 Verification 500
+Benchmarking sample_size/BASE 4 Verification 500: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Verification 500: Collecting 10 samples in estimated 36.820 s (165 iterations)
+Benchmarking sample_size/BASE 4 Verification 500: Analyzing
+sample_size/BASE 4 Verification 500
+                        time:   [216.58 ms 230.91 ms 261.65 ms]
+                        change: [+24.646% +30.157% +40.439%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high severe
+Benchmarking sample_size/BASE 4 Issuance 1000
+Benchmarking sample_size/BASE 4 Issuance 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Issuance 1000: Collecting 10 samples in estimated 25.028 s (3355 iterations)
+Benchmarking sample_size/BASE 4 Issuance 1000: Analyzing
+sample_size/BASE 4 Issuance 1000
+                        time:   [7.0793 ms 7.1238 ms 7.1561 ms]
+                        change: [+23.873% +24.995% +26.162%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking sample_size/BASE 4 Proof 1000
+Benchmarking sample_size/BASE 4 Proof 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Proof 1000: Collecting 10 samples in estimated 26.104 s (110 iterations)
+Benchmarking sample_size/BASE 4 Proof 1000: Analyzing
+sample_size/BASE 4 Proof 1000
+                        time:   [170.02 ms 170.60 ms 171.48 ms]
+                        change: [+24.927% +30.443% +38.982%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high severe
+theta 1000 length 4328 bytes
+Benchmarking sample_size/BASE 4 Verification 1000
+Benchmarking sample_size/BASE 4 Verification 1000: Warming up for 3.0000 s
+Benchmarking sample_size/BASE 4 Verification 1000: Collecting 10 samples in estimated 36.759 s (165 iterations)
+Benchmarking sample_size/BASE 4 Verification 1000: Analyzing
+sample_size/BASE 4 Verification 1000
+                        time:   [216.53 ms 232.99 ms 262.21 ms]
+                        change: [+24.367% +29.331% +38.564%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+

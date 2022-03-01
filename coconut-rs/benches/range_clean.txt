@@ -1,0 +1,119 @@
+sample_size/BASE 2 Issuance 10
+                        time:   [5.2543 ms 6.2966 ms 7.2846 ms]
+sample_size/BASE 2 Proof 10
+                        time:   [180.89 ms 204.30 ms 261.65 ms]
+theta 10 length 3624 bytes
+sample_size/BASE 2 Verification 10
+                        time:   [233.11 ms 266.10 ms 309.24 ms]
+
+sample_size/BASE 2 Issuance 50
+                        time:   [4.6713 ms 5.5467 ms 6.6180 ms]
+sample_size/BASE 2 Proof 50
+                        time:   [265.10 ms 312.06 ms 374.78 ms]
+theta 50 length 5032 bytes
+sample_size/BASE 2 Verification 50
+                        time:   [315.31 ms 351.95 ms 426.65 ms]
+
+sample_size/BASE 2 Issuance 100
+                        time:   [4.2332 ms 4.5047 ms 5.2333 ms]
+sample_size/BASE 2 Proof 100
+                        time:   [274.35 ms 300.33 ms 343.91 ms]
+theta 100 length 5736 bytes
+sample_size/BASE 2 Verification 100
+                        time:   [347.47 ms 399.23 ms 467.81 ms]
+
+sample_size/BASE 2 Issuance 500
+                        time:   [4.2459 ms 5.3295 ms 6.8644 ms]
+sample_size/BASE 2 Proof 500
+                        time:   [387.64 ms 427.46 ms 452.62 ms]
+theta 500 length 7144 bytes
+sample_size/BASE 2 Verification 500
+                        time:   [437.41 ms 543.84 ms 655.35 ms]
+
+sample_size/BASE 2 Issuance 1000
+                        time:   [4.3205 ms 5.1526 ms 6.2073 ms]
+sample_size/BASE 2 Proof 1000
+                        time:   [384.70 ms 442.36 ms 504.75 ms]
+theta 1000 length 7848 bytes
+sample_size/BASE 2 Verification 1000
+                        time:   [422.04 ms 495.06 ms 626.92 ms]
+
+sample_size/BASE 3 Issuance 10
+                        time:   [5.3684 ms 5.4669 ms 5.7714 ms]
+sample_size/BASE 3 Proof 10
+                        time:   [125.40 ms 140.36 ms 167.64 ms]
+theta 10 length 2920 bytes
+sample_size/BASE 3 Verification 10
+                        time:   [151.63 ms 177.01 ms 209.25 ms]
+
+sample_size/BASE 3 Issuance 50
+                        time:   [5.7233 ms 6.6891 ms 8.0111 ms]
+sample_size/BASE 3 Proof 50
+                        time:   [147.74 ms 163.83 ms 184.53 ms]
+theta 50 length 3624 bytes
+sample_size/BASE 3 Verification 50
+                        time:   [180.87 ms 189.19 ms 211.41 ms]
+
+sample_size/BASE 3 Issuance 100
+                        time:   [5.3541 ms 5.4412 ms 5.7078 ms]
+sample_size/BASE 3 Proof 100
+                        time:   [198.07 ms 212.08 ms 243.72 ms]
+theta 100 length 4328 bytes
+sample_size/BASE 3 Verification 100
+                        time:   [252.45 ms 260.20 ms 270.79 ms]
+
+sample_size/BASE 3 Issuance 500
+                        time:   [5.9413 ms 6.6710 ms 8.0147 ms]
+sample_size/BASE 3 Proof 500
+                        time:   [213.37 ms 249.20 ms 295.24 ms]
+theta 500 length 5032 bytes
+sample_size/BASE 3 Verification 500
+                        time:   [253.15 ms 276.96 ms 327.22 ms]
+
+sample_size/BASE 3 Issuance 1000
+                        time:   [5.3187 ms 5.8199 ms 6.5065 ms]
+sample_size/BASE 3 Proof 1000
+                        time:   [228.75 ms 255.13 ms 301.39 ms]
+theta 1000 length 5736 bytes
+sample_size/BASE 3 Verification 1000
+                        time:   [291.01 ms 318.17 ms 366.35 ms]
+
+sample_size/BASE 4 Issuance 10
+                        time:   [7.0881 ms 7.8510 ms 8.9781 ms]
+sample_size/BASE 4 Proof 10
+                        time:   [80.830 ms 89.589 ms 101.78 ms]
+theta 10 length 2216 bytes
+sample_size/BASE 4 Verification 10
+                        time:   [105.92 ms 116.76 ms 132.79 ms]
+
+sample_size/BASE 4 Issuance 50
+                        time:   [7.0806 ms 7.9311 ms 9.4262 ms]
+sample_size/BASE 4 Proof 50
+                        time:   [110.45 ms 110.68 ms 110.88 ms]
+theta 50 length 2920 bytes
+sample_size/BASE 4 Verification 50
+                        time:   [142.84 ms 148.01 ms 161.87 ms]
+
+sample_size/BASE 4 Issuance 100
+                        time:   [7.1169 ms 7.1706 ms 7.3217 ms]
+sample_size/BASE 4 Proof 100
+                        time:   [139.79 ms 146.57 ms 166.80 ms]
+theta 100 length 3624 bytes
+sample_size/BASE 4 Verification 100
+                        time:   [179.57 ms 186.73 ms 209.71 ms]
+
+sample_size/BASE 4 Issuance 500
+                        time:   [7.0916 ms 7.5528 ms 8.8094 ms]
+sample_size/BASE 4 Proof 500
+                        time:   [169.95 ms 181.12 ms 208.02 ms]
+theta 500 length 4328 bytes
+sample_size/BASE 4 Verification 500
+                        time:   [216.58 ms 230.91 ms 261.65 ms]
+
+sample_size/BASE 4 Issuance 1000
+                        time:   [7.0793 ms 7.1238 ms 7.1561 ms]
+sample_size/BASE 4 Proof 1000
+                        time:   [170.02 ms 170.60 ms 171.48 ms]
+theta 1000 length 4328 bytes
+sample_size/BASE 4 Verification 1000
+                        time:   [216.53 ms 232.99 ms 262.21 ms]
