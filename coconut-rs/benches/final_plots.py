@@ -10,16 +10,16 @@ mpl.use("GTK4Cairo")
 x_values = [10, 50, 100, 500, 1000]
 
 # no proof
-none_prove = [12.953] * len(x_values)
+none_prove = [6.5899] * len(x_values)
 none_proof_size = [296] * len(x_values)
-none_verify =[21.274] * len(x_values)
+none_verify =[9.6713] * len(x_values)
 
 # set membership proof
 set_issue = [11.103, 68.859, 143.02, 636.25, 1397.3]
 set_issuance_size = [value * 96 for value in x_values]
-set_prove = [15.253, 17.297, 15.945, 16.809, 16.719]
+set_prove = [16.433, 16.197, 15.945, 16.809, 16.719]
 set_proof_size = [680] * len(x_values)
-set_verify = [19.973, 19.297, 18.595, 21.271, 18.511]
+set_verify = [19.973, 19.297, 18.872, 19.472, 18.511]
 
 range_issue_2 = [2.6061, 2.8156, 2.8066, 2.8068, 2.8043]
 range_issuance_size_2 = [2*96] * len(x_values)
